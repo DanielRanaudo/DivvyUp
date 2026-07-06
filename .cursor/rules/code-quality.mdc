@@ -1,0 +1,57 @@
+---
+description: Code quality and performance standards for DivvyUp (adapted from cursorrules)
+alwaysApply: true
+---
+
+# DivvyUp Code Quality Standards
+
+Adapted from the full guide in `cursorrules` (repo root). The original targets a
+different stack (React Query, shadcn); these are the parts that apply here.
+
+## Core principles
+
+- Zero duplicate code: search the codebase before writing new functionality;
+  extract shared logic to `src/lib/` immediately.
+- Consistent patterns: follow existing conventions (design tokens from
+  `src/lib/tokens.ts`, pure business logic in `src/lib/`, UI in components).
+- Refactor as you code; don't leave debt "for later".
+
+## React
+
+- Prefer derived values (`useMemo`) over `useEffect` + `setState` syncing.
+- `useEffect` only for real side effects (subscriptions, API calls, DOM).
+- Prefer event handlers over effects for user interactions.
+- Stable, unique `key` props on lists (never array index for dynamic lists).
+- Split components over ~300 lines; extract hooks/sub-components.
+
+## Design system
+
+- Use `T`, `inputStyle`, `labelStyle`, `cardStyle`, `secTitle` from
+  `src/lib/tokens.ts`. Never hardcode colors, radii, shadows, or fonts.
+
+## TypeScript
+
+- No `any` (use `unknown` + narrowing); comment the exception if unavoidable.
+- `interface` for object shapes, `type` for unions.
+- Explicit return types on exported functions.
+
+## Error handling
+
+- Every async write must surface failures to the user (see
+  `persistGroupDiff` + save-error toast pattern in `src/app/page.tsx`).
+- User-friendly messages; no raw technical errors in UI.
+- No `console.log` in production code (`console.error`/`warn` ok).
+
+## Testing
+
+- Business logic in `src/lib/` gets Vitest coverage (`*.test.ts` colocated).
+- Test behavior, not implementation details.
+
+## Accessibility
+
+- Semantic HTML; `aria-label` on icon-only buttons; keyboard accessible.
+
+## Git
+
+- Conventional commits: `type(scope): subject` (feat, fix, docs, refactor,
+  perf, test, chore).

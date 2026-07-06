@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { T, inputStyle, labelStyle, cardStyle, secTitle } from "@/lib/tokens";
 import { uid } from "@/lib/utils";
+import { USE_BACKEND } from "@/lib/config";
+import { createClient } from "@/lib/supabase/client";
+import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
+import { fileToCompressedDataURL, fileToCompressedBlob } from "@/lib/image";
+import { uploadReceipts } from "@/lib/receipts";
 import type { Group, Member } from "@/lib/types";
 
 interface ExpensesTabProps {
@@ -12,17 +17,113 @@ interface ExpensesTabProps {
   isTreasurer: boolean;
 }
 
+function ReceiptThumbs({
+  images,
+  onView,
+}: {
+  images?: string[];
+  onView: (src: string) => void;
+}) {
+  if (!images || images.length === 0) return null;
+  return (
+    <button
+      onClick={() => onView(images[0])}
+      aria-label="View receipt"
+      style={{
+        position: "relative",
+        width: 40,
+        height: 40,
+        padding: 0,
+        border: `1px solid ${T.border}`,
+        borderRadius: 8,
+        overflow: "hidden",
+        cursor: "pointer",
+        background: T.bg,
+        flexShrink: 0,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={images[0]}
+        alt="Receipt"
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+      {images.length > 1 && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: 0,
+            right: 0,
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "1px 4px",
+            borderTopLeftRadius: 6,
+          }}
+        >
+          {images.length}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function ExpensesTab({
   group,
   setGroup,
   currentUser,
   isTreasurer,
 }: ExpensesTabProps) {
+  const [supabase] = useState(() =>
+    USE_BACKEND && typeof window !== "undefined" ? createClient() : null
+  );
   const [showForm, setShowForm] = useState(false);
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pending = group.expenses.filter((e) => e.status === "pending");
   const approved = group.expenses.filter((e) => e.status === "approved");
+
+  const handleFiles = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (files.length === 0) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      if (supabase) {
+        // Backend mode: upload compressed images to Supabase Storage and
+        // keep only the public URLs (base64 in the DB bloats every fetch).
+        const blobs = await Promise.all(
+          files.map((f) => fileToCompressedBlob(f))
+        );
+        const urls = await uploadReceipts(supabase, group.id, blobs);
+        setImages((prev) => [...prev, ...urls]);
+      } else {
+        // Sandbox/local mode: no storage, keep images in memory.
+        const encoded = await Promise.all(
+          files.map((f) => fileToCompressedDataURL(f))
+        );
+        setImages((prev) => [...prev, ...encoded]);
+      }
+    } catch {
+      setUploadError("Receipt upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const submitExpense = () => {
     const amt = parseFloat(amount);
@@ -38,12 +139,14 @@ export default function ExpensesTab({
           submittedBy: currentUser.id,
           submittedByName: currentUser.name,
           status: "pending" as const,
+          images: images.length > 0 ? images : undefined,
           date: new Date().toISOString(),
         },
       ],
     }));
     setDesc("");
     setAmount("");
+    setImages([]);
     setShowForm(false);
   };
 
@@ -119,12 +222,114 @@ export default function ExpensesTab({
               <label style={labelStyle}>Amount</label>
               <input
                 type="number"
+                min={0}
+                step="0.01"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  if (isNonNegativeInput(e.target.value))
+                    setAmount(e.target.value);
+                }}
+                onKeyDown={blockNegativeKeys}
                 placeholder="0.00"
                 style={inputStyle}
               />
             </div>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Receipts</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => handleFiles(e.target.files)}
+              style={{ display: "none" }}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              {images.map((src, i) => (
+                <div
+                  key={i}
+                  style={{ position: "relative", width: 64, height: 64 }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={`Receipt ${i + 1}`}
+                    onClick={() => setViewImage(src)}
+                    style={{
+                      width: 64,
+                      height: 64,
+                      objectFit: "cover",
+                      borderRadius: T.radiusSm,
+                      cursor: "pointer",
+                      border: `1px solid ${T.border}`,
+                    }}
+                  />
+                  <button
+                    onClick={() => removeImage(i)}
+                    aria-label="Remove receipt"
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      border: "none",
+                      background: T.red,
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: T.radiusSm,
+                  border: `1px dashed ${T.tertiary}`,
+                  background: T.bg,
+                  color: T.secondary,
+                  fontSize: 22,
+                  cursor: uploading ? "default" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {uploading ? "…" : "+"}
+              </button>
+            </div>
+            {uploadError && (
+              <div
+                style={{
+                  color: T.red,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  marginTop: 8,
+                }}
+              >
+                {uploadError}
+              </div>
+            )}
           </div>
           <button
             onClick={submitExpense}
@@ -197,6 +402,7 @@ export default function ExpensesTab({
                     by {e.submittedByName}
                   </div>
                 </div>
+                <ReceiptThumbs images={e.images} onView={setViewImage} />
                 <div
                   style={{
                     fontFamily: T.mono,
@@ -315,6 +521,7 @@ export default function ExpensesTab({
                     {(e.amount / group.members.length).toFixed(2)}/person
                   </div>
                 </div>
+                <ReceiptThumbs images={e.images} onView={setViewImage} />
                 <div
                   style={{
                     fontFamily: T.mono,
@@ -340,6 +547,54 @@ export default function ExpensesTab({
           }}
         >
           No expenses yet
+        </div>
+      )}
+
+      {viewImage && (
+        <div
+          onClick={() => setViewImage(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={viewImage}
+            alt="Receipt"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              borderRadius: T.radius,
+              boxShadow: T.shadowLg,
+            }}
+          />
+          <button
+            onClick={() => setViewImage(null)}
+            aria-label="Close"
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              border: "none",
+              background: "rgba(255,255,255,0.15)",
+              color: "#fff",
+              fontSize: 22,
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
     </div>

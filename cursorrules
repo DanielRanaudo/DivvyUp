@@ -1,0 +1,1090 @@
+# PLEC React Performance & Code Hygiene Rules
+
+## ⚠️ CRITICAL: READ THESE RULES BEFORE EVERY CODE CHANGE
+
+**This file MUST be referenced at the start of every coding session. These rules are not optional - they are mandatory standards for all code changes.**
+
+### Key Principles (Always Enforce):
+1. **ZERO duplicate code** - Extract shared logic immediately, search codebase first
+2. **ZERO redundant queries** - Check cache, optimize invalidation, batch operations
+3. **Consistent patterns** - Follow established patterns, don't create new ones unnecessarily
+4. **Refactor as you code** - Don't leave technical debt "for later"
+5. **Search before creating** - Always check for existing functionality before writing new code
+
+## React Performance Rules (Marketplace-Critical)
+
+### 1. useEffect Best Practices
+- **AVOID redundant useEffects**: Never use useEffect to sync state with props or other state unless absolutely necessary. Prefer derived values with useMemo.
+- **AVOID useEffect for calculations**: Use useMemo/useCallback instead. useEffect should only be for side effects (API calls, subscriptions, DOM manipulation).
+- **Minimize useEffect dependencies**: Only include values that actually affect the side effect. Use functional updates when possible.
+- **Prefer event handlers over useEffect**: For user interactions, use onClick/onChange handlers instead of useEffect watching state.
+- **Batch related state updates**: Use single setState with object or functional updates to avoid multiple renders.
+
+### 2. State Management Rules
+- **Avoid unnecessary useState**: If a value can be computed from props/other state, use useMemo instead.
+- **Flatten state**: Prefer single state object over multiple useState calls when state is related.
+- **Use state machines**: For complex state with multiple transitions (loading, success, error), prefer a state machine pattern over multiple booleans.
+- **Avoid state in derived values**: Don't store computed values in state - compute them in render or with useMemo.
+
+### 3. Memoization Rules
+- **Memoize expensive computations**: Any filtering, mapping, or complex calculations on arrays/objects should use useMemo.
+- **Memoize callbacks passed to children**: Use useCallback for functions passed as props, especially to memoized components.
+- **Memoize list items**: Use React.memo for list item components that render frequently.
+- **Don't over-memoize**: Only memoize when there's a measurable performance benefit (lists, expensive renders, frequent re-renders).
+
+### 4. Component Optimization
+- **Split large components**: Components over 300 lines should be split. Extract hooks, sub-components, or utility functions.
+- **Lazy load routes**: Use React.lazy() for route-level code splitting.
+- **Lazy load heavy components**: Use React.lazy() for heavy components (charts, maps, editors) that aren't immediately visible.
+- **Avoid inline object/array props**: Creating new objects/arrays in JSX causes unnecessary re-renders. Move outside render or memoize.
+
+### 5. Query & Data Fetching
+- **Use React Query properly**: 
+  - Set appropriate staleTime/cacheTime for marketplace data (venues, listings).
+  - Use enabled option to prevent unnecessary fetches.
+  - Use select option to transform data at query level.
+- **Avoid fetching in loops**: Batch data fetching or use parallel queries.
+- **Invalidate strategically**: Only invalidate related queries, not all queries.
+  - Use `refetchType: 'none'` when invalidating to prevent automatic refetches
+  - Only refetch specific queries that actually need fresh data
+  - Avoid invalidating entire query keys when only one query needs updating
+- **Use prefetching**: Prefetch data for likely next actions (hovering over venue card prefetches details).
+- **Eliminate redundant queries**: 
+  - Before adding a new query, check if the data is already available in cache
+  - Use optimistic updates to avoid unnecessary refetches
+  - Batch query invalidations and refetches to reduce network calls
+  - Never trigger multiple refetches for the same data in quick succession
+
+### 6. Render Performance
+- **Avoid creating components in render**: Don't define components inside other components.
+- **Move static data outside component**: Constants, configuration, and static objects should be outside component scope.
+- **Use key prop correctly**: Use stable, unique keys for lists. Never use index for keys unless list is truly static.
+- **Conditional rendering optimization**: Use early returns instead of nested ternaries when possible.
+
+## Code Hygiene Rules
+
+### 1. Component Structure
+- **Single responsibility**: Each component should do one thing well.
+- **Extract custom hooks**: Logic used in multiple places should be a custom hook.
+- **Keep components small**: Aim for <200 lines. Split if longer.
+- **Prop types**: Use TypeScript interfaces for props, not inline types.
+
+### 2. File Organization
+- **One component per file**: Except for closely related components (parent/child).
+- **Co-locate related files**: Hooks, utils, and types near the component that uses them.
+- **Index files**: Use index files for clean imports in frequently used directories.
+
+### 3. Naming Conventions
+- **Components**: PascalCase (e.g., `VenueCard.tsx`)
+- **Hooks**: camelCase starting with "use" (e.g., `useVenueData.ts`)
+- **Utils**: camelCase (e.g., `formatPrice.ts`)
+- **Types/Interfaces**: PascalCase (e.g., `VenueListing.ts`)
+- **Constants**: UPPER_SNAKE_CASE for true constants, camelCase for config objects
+
+### 4. Error Handling
+- **Error boundaries**: Use Error Boundaries for route-level error catching.
+- **Graceful degradation**: Always provide fallback UI for failed states.
+- **User-friendly errors**: Don't expose technical error messages to users.
+
+### 5. Accessibility
+- **Semantic HTML**: Use proper HTML elements (button, nav, main, etc.).
+- **ARIA labels**: Add aria-label for icon-only buttons and complex interactions.
+- **Keyboard navigation**: Ensure all interactive elements are keyboard accessible.
+- **Focus management**: Manage focus for modals, dropdowns, and dynamic content.
+
+## Design System & Centralized Configuration (MANDATORY)
+
+**ALWAYS use designated config files. Never hardcode modals, colors, spacing, or other UI constants.**
+
+### Designated Files to Use
+- **`lib/modal-config.ts`** – Modal backdrop, animation, types. Use `MODAL_CONFIG` and `MODAL_TYPES` (DESKTOP_STANDARD, CRITICAL, SUCCESS) for consistent overlay darkness and animations.
+- **`lib/design-tokens.ts`** – Modal border radius, shadow, padding, max-width; card styles; button styles. Use `designTokens.modal`, `designTokens.card`, etc.
+- **`components/ui/dialog.tsx`** – Primary modal component. Use `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` for all modals (including confirmations). Prefer over `AlertDialog` when possible—Dialog uses the shared design system.
+- **`components/ui/alert-dialog.tsx`** – Only when you need the AlertDialog primitive (focus trap, prevent accidental dismissal). Must use `MODAL_CONFIG` / `MODAL_TYPES` and `designTokens`—no hardcoded backdrop or styles.
+- **CSS variables** – Colors, radius, spacing. Use `hsl(var(--brand))`, `var(--radius)`, etc. Never hardcode hex colors or pixel values for design tokens.
+
+### Rules
+1. **Modals**: Use `Dialog` from `@/components/ui/dialog` for modals and confirmations. It already uses `designTokens` and consistent backdrop (`bg-black/40 backdrop-blur-sm`). Do NOT create new modal overlays or hardcode `bg-black/80` or similar.
+2. **Colors**: Use CSS variables (`--brand`, `--muted-foreground`, `--destructive`, etc.) and Tailwind semantic classes (`text-muted-foreground`, `bg-destructive`). No ad-hoc hex or rgb values.
+3. **Spacing & radius**: Use `designTokens` or Tailwind scale. No magic numbers for modal padding, border-radius, or shadows.
+4. **Before adding UI**: Check `lib/modal-config.ts`, `lib/design-tokens.ts`, and `components/ui` for existing components and tokens. Reuse—do not reinvent.
+
+### Anti-Patterns
+```tsx
+// ❌ BAD: Hardcoded modal backdrop
+<AlertDialogOverlay className="bg-black/80" />
+
+// ✅ GOOD: Use modal config
+import { MODAL_TYPES } from "@/lib/modal-config";
+className={MODAL_TYPES.CRITICAL.backdrop}
+
+// ❌ BAD: Creating new confirmation UI instead of using Dialog
+<customModal><div className="bg-gray-900/70">...</div></customModal>
+
+// ✅ GOOD: Use existing Dialog
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent>
+    <DialogHeader>...</DialogHeader>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+      <Button variant="destructive" onClick={onConfirm}>Confirm</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+## Marketplace-Specific Rules
+
+### 1. Image Optimization
+- **Lazy load images**: Use loading="lazy" for images below the fold.
+- **Responsive images**: Use srcset for different screen sizes.
+- **Placeholders**: Show skeleton loaders or blur placeholders while images load.
+
+### 2. Search & Filter Performance
+- **Debounce search**: Use 300-500ms debounce for search inputs.
+- **Virtualize long lists**: Use react-window or similar for lists >100 items.
+- **Memoize filters**: Cache filter results to avoid recalculating on every render.
+
+### 3. Cart & Checkout
+- **Optimistic updates**: Update UI optimistically, then sync with server.
+- **Local storage**: Cache cart state locally for persistence.
+- **Batch updates**: Group multiple cart operations into single API call when possible.
+
+### 4. Data Synchronization
+- **Avoid polling**: Use WebSockets or SSE for real-time updates when needed.
+- **Smart refetching**: Only refetch when user returns to tab/window, not on every focus.
+- **Cache invalidation**: Use React Query's smart invalidation patterns.
+
+## Code Review Checklist
+
+Before submitting code, ensure:
+- [ ] No redundant useEffects (check if logic can be in render/useMemo)
+- [ ] All expensive computations are memoized
+- [ ] Callbacks passed to children are wrapped in useCallback
+- [ ] No inline object/array creation in JSX props
+- [ ] Large components are split appropriately
+- [ ] Error states are handled gracefully
+- [ ] Loading states are shown for async operations
+- [ ] No console.logs in production code
+- [ ] TypeScript types are properly defined (no `any` unless absolutely necessary)
+- [ ] No unused imports or variables
+- [ ] Proper key props on list items
+- [ ] Accessibility attributes where needed
+
+## Anti-Patterns to Avoid
+
+❌ **DON'T:**
+```tsx
+// Bad: Redundant useEffect syncing state
+const [fullName, setFullName] = useState('');
+useEffect(() => {
+  setFullName(`${firstName} ${lastName}`);
+}, [firstName, lastName]);
+
+// Good: Derived value
+const fullName = useMemo(() => `${firstName} ${lastName}`, [firstName, lastName]);
+```
+
+❌ **DON'T:**
+```tsx
+// Bad: Inline object causing re-renders
+<ChildComponent config={{ type: 'card', size: 'large' }} />
+
+// Good: Move outside or memoize
+const config = { type: 'card', size: 'large' };
+<ChildComponent config={config} />
+```
+
+❌ **DON'T:**
+```tsx
+// Bad: Fetching in useEffect without cleanup
+useEffect(() => {
+  fetchData().then(setData);
+}, []);
+
+// Good: Use React Query or proper cleanup
+const { data } = useQuery({ queryKey: ['data'], queryFn: fetchData });
+```
+
+❌ **DON'T:**
+```tsx
+// Bad: Multiple useState for related state
+const [isLoading, setIsLoading] = useState(false);
+const [error, setError] = useState(null);
+const [data, setData] = useState(null);
+
+// Good: State machine or single state object
+const [state, setState] = useState({ isLoading: false, error: null, data: null });
+```
+
+## Performance Monitoring
+
+- Use React DevTools Profiler to identify slow renders
+- Monitor bundle size with `npm run build` and check output
+- Use Lighthouse for real-world performance metrics
+- Add performance markers for critical user flows
+
+## When to Break These Rules
+
+These rules can be relaxed if:
+- Premature optimization would harm readability
+- The optimization doesn't provide measurable benefit
+- The code change would introduce bugs or complexity
+
+**Remember**: Readable, maintainable code is more important than micro-optimizations. But for a marketplace, performance directly impacts revenue, so default to optimizing.
+
+---
+
+## TypeScript Standards
+
+### 1. Type Safety Rules
+- **NO `any` types**: Use `unknown` and type narrowing instead. Only use `any` if absolutely necessary and add a comment explaining why.
+- **Prefer `interface` over `type`**: Use `interface` for object shapes, `type` for unions/intersections/primitives.
+- **Explicit return types**: Add return types to exported functions and complex functions.
+- **Use utility types**: Prefer `Partial<T>`, `Pick<T>`, `Omit<T>`, `Record<K, V>` over manual types.
+- **Type narrowing**: Use type guards, discriminated unions, and assertion functions for safe type narrowing.
+
+### 2. Type Patterns
+```typescript
+// ❌ BAD: Using any
+function processData(data: any) { }
+
+// ✅ GOOD: Using unknown with type guard
+function processData(data: unknown) {
+  if (isValidData(data)) {
+    // data is now typed
+  }
+}
+
+// ✅ GOOD: Discriminated union
+type Result<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+// ✅ GOOD: Utility types
+type UserUpdate = Partial<Pick<User, 'name' | 'email'>>;
+type UserKeys = keyof User;
+```
+
+### 3. Generic Usage
+- **Use generics for reusable code**: When a function/component works with multiple types.
+- **Constrain generics**: Use `extends` to add constraints when needed.
+- **Prefer explicit generic params**: When type inference might be unclear.
+
+```typescript
+// ✅ GOOD: Constrained generic
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+
+// ✅ GOOD: Explicit generic for clarity
+const query = useQuery<string>({ queryKey: ['user'], queryFn: fetchUser });
+```
+
+---
+
+## Error Handling Patterns
+
+### 1. Error Handling Rules
+- **Always handle errors**: No unhandled promises or try-catch without error handling.
+- **Use error boundaries**: For React component errors at route/page level.
+- **Log errors appropriately**: Use proper logging service, include context.
+- **User-friendly messages**: Never expose technical errors to users.
+- **Error transformation**: Normalize errors into consistent shape.
+
+### 2. Async Error Handling
+```typescript
+// ❌ BAD: Unhandled promise
+const data = await fetchData();
+
+// ✅ GOOD: Proper error handling
+try {
+  const data = await fetchData();
+  return { success: true, data };
+} catch (error) {
+  logger.error('Failed to fetch data', { error, context });
+  return { success: false, error: 'Failed to load data. Please try again.' };
+}
+
+// ✅ GOOD: React Query with error handling
+const { data, error, isError } = useQuery({
+  queryKey: ['data'],
+  queryFn: fetchData,
+  onError: (error) => {
+    logger.error('Query failed', { error });
+    toast.error('Failed to load data');
+  },
+});
+```
+
+### 3. Error Types
+```typescript
+// ✅ GOOD: Custom error classes
+class APIError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public code: string
+  ) {
+    super(message);
+    this.name = 'APIError';
+  }
+}
+
+// ✅ GOOD: Error result type
+type Result<T, E = Error> = 
+  | { success: true; data: T }
+  | { success: false; error: E };
+```
+
+### 4. Network Error Recovery
+- **Retry logic**: Use exponential backoff for transient failures.
+- **Timeout handling**: Set timeouts for network requests.
+- **Fallback strategies**: Provide fallback UI/data when requests fail.
+
+---
+
+## Testing Requirements
+
+### 1. Test Coverage Expectations
+- **Critical paths**: 100% coverage (auth, payments, checkout)
+- **Business logic**: 80%+ coverage
+- **UI components**: 70%+ coverage (focus on user interactions)
+- **Utilities/helpers**: 90%+ coverage
+
+### 2. What to Test
+- ✅ User interactions (clicks, form submissions)
+- ✅ Business logic (calculations, validations, transformations)
+- ✅ Error handling (error states, edge cases)
+- ✅ API integrations (mocked)
+- ✅ Critical user flows (e2e for checkout, auth)
+
+### 3. What NOT to Test
+- ❌ Third-party library internals
+- ❌ Simple getters/setters
+- ❌ Implementation details (test behavior, not internals)
+
+### 4. Test Patterns
+```typescript
+// ✅ GOOD: Test file naming
+// UserProfile.test.tsx
+// calculatePrice.test.ts
+
+// ✅ GOOD: Test structure (AAA pattern)
+describe('calculatePrice', () => {
+  it('should calculate total with tax', () => {
+    // Arrange
+    const basePrice = 100;
+    const taxRate = 0.1;
+    
+    // Act
+    const result = calculatePrice(basePrice, taxRate);
+    
+    // Assert
+    expect(result).toBe(110);
+  });
+});
+
+// ✅ GOOD: Test user interactions
+it('should submit form with valid data', async () => {
+  render(<CheckoutForm />);
+  
+  await userEvent.type(screen.getByLabelText('Email'), 'test@example.com');
+  await userEvent.click(screen.getByRole('button', { name: /submit/i }));
+  
+  await waitFor(() => {
+    expect(mockSubmit).toHaveBeenCalledWith({ email: 'test@example.com' });
+  });
+});
+```
+
+### 5. Mocking Guidelines
+- **Mock external dependencies**: API calls, third-party services
+- **Use MSW for API mocking**: Mock Service Worker for realistic API mocks
+- **Mock React Query**: Use `@tanstack/react-query` test utilities
+- **Don't mock everything**: Test real implementations when possible
+
+---
+
+## Code Quality Standards
+
+### 1. Complexity Limits
+- **Cyclomatic complexity**: Max 10 per function
+- **Function length**: Max 50 lines (extract helpers if longer)
+- **Parameters**: Max 4 parameters (use object parameter if more)
+- **Nesting depth**: Max 3 levels (extract functions to reduce)
+
+### 2. Extraction Guidelines
+```typescript
+// ❌ BAD: Too long, too many parameters
+function processOrder(userId: string, items: Item[], discount: number, tax: number, shipping: number) {
+  // 80 lines of code
+}
+
+// ✅ GOOD: Extracted, object parameter
+function processOrder(order: ProcessOrderParams): OrderResult {
+  const subtotal = calculateSubtotal(order.items);
+  const discountAmount = applyDiscount(subtotal, order.discount);
+  const taxAmount = calculateTax(discountAmount, order.tax);
+  return createOrder({ ...order, subtotal, discountAmount, taxAmount });
+}
+```
+
+### 3. Function Extraction Triggers
+Extract a function when:
+- Function exceeds 50 lines
+- Code is repeated 2+ times
+- Logic can be tested independently
+- Function does multiple things (violates single responsibility)
+
+---
+
+## Data Validation
+
+### 1. Validation Requirements
+- **Validate all user input**: Forms, URL params, query strings
+- **Validate API responses**: Use Zod/Yup schemas
+- **Type guards**: For runtime type checking
+- **Fail fast**: Validate at boundaries (API, component props)
+
+### 2. Validation Patterns
+```typescript
+// ✅ GOOD: Zod schema for API response
+import { z } from 'zod';
+
+const ListingSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(200),
+  price: z.number().positive(),
+  status: z.enum(['draft', 'published', 'archived']),
+});
+
+type Listing = z.infer<typeof ListingSchema>;
+
+// ✅ GOOD: Type guard
+function isListing(data: unknown): data is Listing {
+  return ListingSchema.safeParse(data).success;
+}
+
+// ✅ GOOD: Validate API response
+const response = await fetch('/api/listings');
+const data = await response.json();
+const listing = ListingSchema.parse(data); // Throws if invalid
+
+// ✅ GOOD: Form validation with React Hook Form + Zod
+const formSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+const { register, handleSubmit } = useForm({
+  resolver: zodResolver(formSchema),
+});
+```
+
+### 3. Input Sanitization
+- **Sanitize user-generated content**: Strip HTML, escape special chars
+- **Validate file uploads**: Type, size, content validation
+- **URL validation**: Validate and sanitize URLs before use
+
+---
+
+## Async/Promise Patterns
+
+### 1. Async/Await vs Promises
+- **Prefer async/await**: More readable, easier error handling
+- **Use Promise.all for parallel**: When operations are independent
+- **Use Promise.allSettled**: When you need all results regardless of failures
+- **Avoid promise chains**: Unless necessary for specific control flow
+
+### 2. Async Patterns
+```typescript
+// ❌ BAD: Promise chain
+fetchUser()
+  .then(user => fetchProfile(user.id))
+  .then(profile => fetchSettings(profile.id))
+  .catch(error => console.error(error));
+
+// ✅ GOOD: Async/await
+try {
+  const user = await fetchUser();
+  const profile = await fetchProfile(user.id);
+  const settings = await fetchSettings(profile.id);
+} catch (error) {
+  logger.error('Failed to load data', { error });
+}
+
+// ✅ GOOD: Parallel requests
+const [user, listings, bookings] = await Promise.all([
+  fetchUser(),
+  fetchListings(),
+  fetchBookings(),
+]);
+
+// ✅ GOOD: All settled (need all results)
+const results = await Promise.allSettled([
+  fetchPrimaryData(),
+  fetchSecondaryData(),
+]);
+```
+
+### 3. Race Condition Prevention
+- **Cancel requests**: Use AbortController for cancellable requests
+- **Request deduplication**: React Query handles this automatically
+- **Avoid state updates after unmount**: Check component mount status
+
+```typescript
+// ✅ GOOD: Cancellable request
+const controller = new AbortController();
+
+const fetchData = async () => {
+  try {
+    const response = await fetch('/api/data', {
+      signal: controller.signal,
+    });
+    return response.json();
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Request cancelled');
+    }
+  }
+};
+
+// Cancel on unmount
+useEffect(() => {
+  return () => controller.abort();
+}, []);
+```
+
+---
+
+## Import Organization
+
+### 1. Import Order
+1. External dependencies (React, third-party)
+2. Internal modules (absolute imports)
+3. Relative imports (same directory/component)
+4. Types/interfaces (can be inline or separate)
+5. Styles/assets (CSS, images)
+
+### 2. Import Patterns
+```typescript
+// ✅ GOOD: Organized imports
+// 1. External
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+// 2. Internal (absolute)
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/features/auth';
+import { fetchListings } from '@/lib/api';
+
+// 3. Relative
+import { ListingCard } from './ListingCard';
+import type { Listing } from './types';
+
+// 4. Styles
+import './ListingList.css';
+```
+
+### 3. Barrel Exports
+- **Use index files**: For frequently imported modules
+- **Export consistently**: Use named exports (prefer over default)
+- **Avoid deep barrel exports**: Don't export everything from root index
+
+### 4. Circular Dependency Prevention
+- **Dependency direction**: Higher-level modules shouldn't import lower-level
+- **Extract shared types**: Put shared types in separate file
+- **Use dependency injection**: For cross-cutting concerns
+
+---
+
+## Comments & Documentation
+
+### 1. When to Comment
+- ✅ Complex business logic (explain WHY, not WHAT)
+- ✅ Non-obvious algorithms
+- ✅ Workarounds/hacks (explain why and link to issue)
+- ✅ Public APIs (JSDoc for exported functions)
+
+### 2. When NOT to Comment
+- ❌ Obvious code (code should be self-documenting)
+- ❌ TODOs without context (use issue tracking)
+- ❌ Outdated comments (delete or update)
+
+### 3. Comment Standards
+```typescript
+// ✅ GOOD: Explains WHY
+// We multiply by 1.1 to add 10% platform fee, as per marketplace policy
+const totalPrice = basePrice * 1.1;
+
+// ✅ GOOD: JSDoc for public API
+/**
+ * Calculates the total price including platform fees and taxes.
+ * 
+ * @param basePrice - The base price before fees
+ * @param taxRate - The tax rate (e.g., 0.08 for 8%)
+ * @returns The final price with all fees included
+ * 
+ * @example
+ * const finalPrice = calculateTotalPrice(100, 0.08);
+ * // Returns 118 (100 + 10 fee + 8 tax)
+ */
+export function calculateTotalPrice(basePrice: number, taxRate: number): number {
+  // Implementation
+}
+
+// ❌ BAD: Stating the obvious
+// Set the name to the user's name
+setName(user.name);
+
+// ❌ BAD: TODO without context
+// TODO: Fix this
+```
+
+### 4. TODO/FIXME Guidelines
+- **Include issue reference**: `// TODO(#123): Fix performance issue`
+- **Add context**: `// FIXME: Temporary workaround for API bug, remove when backend is fixed`
+- **Set expiration**: Review TODOs in code reviews
+
+---
+
+## Security Basics
+
+### 1. XSS Prevention
+- **Never use `dangerouslySetInnerHTML`**: Unless absolutely necessary and content is sanitized
+- **Sanitize user input**: Before displaying or storing
+- **Use React's automatic escaping**: Don't bypass built-in XSS protection
+- **Validate URLs**: Before using in links/redirects
+
+```typescript
+// ❌ BAD: XSS vulnerability
+<div dangerouslySetInnerHTML={{ __html: userInput }} />
+
+// ✅ GOOD: React automatically escapes
+<div>{userInput}</div>
+
+// ✅ GOOD: If you must use HTML, sanitize first
+import DOMPurify from 'dompurify';
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userInput) }} />
+```
+
+### 2. Token Storage
+- **Never store in localStorage**: For sensitive tokens (use httpOnly cookies)
+- **Use secure storage**: For client-side tokens (if necessary)
+- **Clear on logout**: Remove all auth tokens
+- **Token expiration**: Handle token refresh properly
+
+```typescript
+// ❌ BAD: Sensitive token in localStorage
+localStorage.setItem('authToken', token);
+
+// ✅ GOOD: httpOnly cookies (backend handles)
+// Or secure, short-lived token in memory only
+```
+
+### 3. Environment Variables
+- **Never commit secrets**: Use .env files (in .gitignore)
+- **Validate env vars**: Check required vars at startup
+- **Use proper prefixes**: VITE_ for frontend, no prefix for backend
+- **Document required vars**: In README or .env.example
+
+```typescript
+// ✅ GOOD: Validate env vars
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) {
+  throw new Error('VITE_API_URL is required');
+}
+```
+
+### 4. API Security
+- **Validate all inputs**: On both client and server
+- **Rate limiting**: Implement on client (show errors) and server (enforce)
+- **HTTPS only**: Never send sensitive data over HTTP
+- **CSRF protection**: Use tokens for state-changing operations
+
+---
+
+## Git/Version Control
+
+### 1. Commit Message Standards
+- **Conventional commits**: Use format `type(scope): subject`
+- **Types**: feat, fix, docs, style, refactor, perf, test, chore
+- **Be descriptive**: Explain WHAT and WHY, not HOW
+
+```
+✅ GOOD:
+feat(checkout): add payment method selection
+fix(auth): prevent token refresh race condition
+perf(listings): memoize filter calculations
+refactor(api): extract validation logic to utils
+
+❌ BAD:
+updated code
+fixed bug
+changes
+```
+
+### 2. Commit Guidelines
+- **Atomic commits**: One logical change per commit
+- **Separate refactors**: Don't mix refactoring with feature changes
+- **Test before commit**: Ensure tests pass
+- **Meaningful diffs**: Review your changes before committing
+
+### 3. Branch Naming
+- **Feature branches**: `feature/checkout-payment-flow`
+- **Bug fixes**: `fix/auth-token-refresh`
+- **Hotfixes**: `hotfix/payment-processing-error`
+- **Refactoring**: `refactor/listing-card-component`
+
+### 4. Pull Request Standards
+- **Small PRs**: Easier to review (aim for <400 lines)
+- **Clear description**: What changed, why, how to test
+- **Link issues**: Reference related issues/tickets
+- **Self-review**: Review your own PR before requesting reviews
+
+---
+
+## Code Review Checklist (Comprehensive)
+
+Before submitting code, ensure:
+- [ ] **DESIGN SYSTEM**: Used designated config files (modal-config, design-tokens). No hardcoded modals, colors, or UI constants.
+- [ ] **NO DUPLICATE CODE**: Searched codebase for existing functionality, extracted shared logic
+- [ ] **NO REDUNDANT QUERIES**: Checked cache before adding new queries, optimized invalidation
+- [ ] **TypeScript**: No `any` types, proper types/interfaces
+- [ ] **Performance**: No redundant useEffects, memoization where needed, no duplicate refetches
+- [ ] **Error handling**: All errors handled, user-friendly messages, consistent patterns
+- [ ] **Validation**: Input validated, API responses validated
+- [ ] **Security**: No XSS risks, secure token handling
+- [ ] **Testing**: Tests added/updated for new features
+- [ ] **Documentation**: Complex logic documented, JSDoc for public APIs
+- [ ] **Imports**: Organized correctly, no circular dependencies
+- [ ] **Code quality**: Functions <50 lines, complexity <10, nesting <3 levels
+- [ ] **Accessibility**: ARIA labels, keyboard navigation, semantic HTML
+- [ ] **No console.logs**: Except for warnings/errors
+- [ ] **Git**: Clear commit messages, atomic commits
+- [ ] **Linting**: All lint errors resolved
+- [ ] **Query optimization**: Used `refetchType: 'none'` when appropriate, batched invalidations
+
+---
+
+---
+
+## Scalability & Architecture for Marketplace Platform
+
+### 1. Scalability Principles
+- **Design for scale from day one**: Code should handle 10x, 100x growth without major rewrites
+- **Stateless components**: Components should not depend on global mutable state
+- **Cache aggressively**: Use React Query, localStorage, sessionStorage for frequently accessed data
+- **Lazy load everything**: Routes, heavy components, images, third-party libraries
+- **Batch operations**: Group related API calls, state updates, and DOM operations
+- **Pagination for lists**: Never load all data at once, implement cursor/offset pagination
+- **Virtualize long lists**: Use react-window/react-virtuoso for lists >50 items
+
+### 2. Code Duplication & DRY Principles (CRITICAL - ALWAYS ENFORCE)
+- **ZERO TOLERANCE for duplicate code**: If code appears 2+ times, extract to hook/utility/component IMMEDIATELY
+- **Before writing ANY code**: Search codebase for existing similar functionality - ALWAYS check first
+- **Component composition over duplication**: Build reusable components, not copy-paste
+- **Shared constants**: Centralize magic numbers, strings, configuration values
+- **Type definitions once**: Share types/interfaces, don't redefine - check existing types first
+- **Business logic in one place**: Extract business rules to services/utils, not in components
+- **Query invalidation patterns**: Use consistent patterns - don't duplicate invalidation logic
+- **Mutation success handlers**: Extract common patterns (toast notifications, cache updates) to shared utilities
+- **ALWAYS refactor as you code**: Don't leave duplicate code "for later" - fix it immediately
+
+```typescript
+// ❌ BAD: Duplicated logic
+const ComponentA = () => {
+  const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
+  // ...
+};
+
+const ComponentB = () => {
+  const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
+  // ...
+};
+
+// ✅ GOOD: Shared utility
+// utils/formatters.ts
+export const formatPrice = (price: number): string => {
+  return `$${(price / 100).toFixed(2)}`;
+};
+```
+
+### 3. File Size & Component Organization (flexible, just keep it in mind doesnt have to be exact)
+- **File size limits**: 
+  - Components: Max 300 lines (split if larger)
+  - Utilities: Max 200 lines (split into logical modules)
+  - Hooks: Max 150 lines (extract sub-hooks)
+  - Types: Max 500 lines (split by domain)
+- **When to split files**:
+  - Multiple unrelated exports
+  - File exceeds size limit
+  - Logic can be tested independently
+  - Component has >5 sub-components
+- **Component extraction triggers**:
+  - JSX block >50 lines
+  - Repeated UI patterns
+  - Complex conditional rendering
+  - Business logic mixed with presentation
+
+### 4. Consistency Enforcement
+- **Design system compliance**: Use shared component library, not custom components
+- **Naming consistency**: Follow established patterns across codebase
+- **API patterns**: Use same request/response patterns, error handling, loading states
+- **State management consistency**: Use same patterns for local vs global state
+- **Code style**: Follow same patterns (early returns, error handling, async patterns)
+
+```typescript
+// ❌ BAD: Inconsistent patterns
+const fetchUser = async () => {
+  try {
+    const res = await fetch('/api/user');
+    return res.json();
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const getListings = () => {
+  return axios.get('/api/listings')
+    .then(res => res.data)
+    .catch(err => alert('Error'));
+};
+
+// ✅ GOOD: Consistent pattern
+const fetchUser = async (): Promise<Result<User>> => {
+  try {
+    const response = await fetchJSON<User>('/api/user');
+    return { success: true, data: response };
+  } catch (error) {
+    logger.error('Failed to fetch user', { error });
+    return { success: false, error: 'Failed to load user' };
+  }
+};
+```
+
+### 5. Redundancy Detection & Prevention (MANDATORY - CHECK EVERY TIME)
+- **Before writing ANY code**: 
+  - Search codebase for existing similar functionality - THIS IS MANDATORY
+  - Check if the functionality already exists in a different form
+  - Look for patterns that can be reused or extended
+- **Design system first**: ALWAYS use `lib/modal-config.ts`, `lib/design-tokens.ts`, and `components/ui` (Dialog, etc.). Never hardcode modal backdrops, colors, or UI constants.
+- **Shared utilities first**: ALWAYS check `/lib` and `/utils` before creating new functions
+- **Component library**: ALWAYS check `/components/ui` and `/components/common` before creating UI
+- **Type reusability**: ALWAYS check existing types before defining new ones
+- **Hook extraction**: If logic appears in 2+ components, extract to hook IMMEDIATELY - don't wait
+- **Query patterns**: Check for existing query/mutation patterns before creating new ones
+- **Error handling**: Use consistent error handling patterns - don't duplicate error handling logic
+- **Loading states**: Use consistent loading state patterns - extract to shared hooks if repeated
+- **Cache invalidation**: Use consistent cache invalidation patterns - don't duplicate invalidation logic
+- **If you see duplicate code while editing**: Fix it immediately, don't leave it for later
+
+### 6. Cross-Cutting Concerns Awareness
+- **When modifying code, check impact on**:
+  - Error handling (does error propagate correctly?)
+  - Loading states (are loading indicators shown?)
+  - Accessibility (keyboard nav, screen readers still work?)
+  - Performance (any new expensive operations?)
+  - Security (any new user input? validated?)
+  - Analytics (track important user actions)
+  - Logging (log errors, important events)
+
+### 7. State Management at Scale
+- **Local state**: Use useState for component-specific UI state
+- **Server state**: Always use React Query (never useState for API data)
+- **Global UI state**: Use Context for theme, modals, notifications
+- **Form state**: Use React Hook Form (not useState for forms)
+- **URL state**: Use URL params/search params for shareable/filterable state
+- **Avoid prop drilling**: Use Context or React Query for deeply nested props
+
+```typescript
+// ❌ BAD: Prop drilling
+<App>
+  <Header user={user} />
+  <Main user={user} listings={listings}>
+    <ListingList user={user} listings={listings} />
+  </Main>
+</App>
+
+// ✅ GOOD: React Query + Context
+// User context at app level
+// Listings via React Query in components that need them
+```
+
+### 8. Database & API Query Optimization
+- **Query optimization rules**:
+  - Never fetch all records (use pagination)
+  - Use select/fields to limit returned data
+  - Batch related queries with Promise.all
+  - Cache aggressively (React Query staleTime based on data volatility)
+  - Invalidate cache strategically (not on every mutation)
+- **N+1 query prevention**: Fetch related data in single query or batch
+- **Index awareness**: Be aware of database indexes when filtering/sorting
+
+```typescript
+// ❌ BAD: N+1 queries
+listings.forEach(listing => {
+  const owner = await fetchUser(listing.ownerId); // N queries!
+});
+
+// ✅ GOOD: Batch query
+const ownerIds = listings.map(l => l.ownerId);
+const owners = await fetchUsers(ownerIds); // 1 query
+```
+
+### 9. Caching Strategy
+- **React Query cache times**:
+  - Static/rarely changing: 30+ minutes (categories, settings)
+  - User data: 5 minutes (profile, preferences)
+  - Dynamic data: 1-2 minutes (listings, search results)
+  - Real-time data: No cache or very short (messages, notifications)
+- **LocalStorage/SessionStorage**:
+  - User preferences: localStorage (persist across sessions)
+  - Cart/checkout: sessionStorage (clear on close)
+  - Temporary UI state: component state only
+- **Cache invalidation**: Invalidate related queries on mutations
+
+### 10. Component Library Consistency
+- **Always use shared components**: Don't create custom buttons, inputs, modals
+- **Extend, don't duplicate**: If component is 90% similar, extend existing component
+- **Follow design system**: Colors, spacing, typography from design tokens
+- **Accessibility built-in**: Use accessible components from library
+
+### 11. Error Boundaries & Resilience
+- **Route-level boundaries**: Wrap each route/page in ErrorBoundary
+- **Graceful degradation**: Features should fail independently
+- **Retry mechanisms**: Implement retry with exponential backoff for transient failures
+- **Fallback UI**: Always provide fallback for failed features
+
+### 12. Monitoring & Observability
+- **Log important events**: User actions, errors, performance metrics
+- **Error tracking**: Use error tracking service (Sentry, etc.)
+- **Performance monitoring**: Track Core Web Vitals, API response times
+- **Analytics**: Track business metrics (conversions, key user flows)
+
+### 13. Future-Proofing Code
+- **Abstraction layers**: Abstract external dependencies (API clients, storage)
+- **Feature flags**: Use feature flags for gradual rollouts
+- **Versioned APIs**: Support API versioning in client code
+- **Extensibility**: Design components/hooks to be extended, not modified
+- **Configuration over code**: Externalize configuration (env vars, config files)
+
+```typescript
+// ❌ BAD: Hard-coded, not extensible
+const fetchListings = async () => {
+  return fetch('https://api.example.com/listings');
+};
+
+// ✅ GOOD: Configurable, extensible
+const apiClient = {
+  baseURL: import.meta.env.VITE_API_URL,
+  fetch: async <T>(endpoint: string): Promise<T> => {
+    return fetchJSON<T>(`${apiClient.baseURL}${endpoint}`);
+  },
+};
+
+const fetchListings = () => apiClient.fetch<Listing[]>('/listings');
+```
+
+### 14. Code Review for Scalability
+Before merging, verify:
+- [ ] No code duplication (checked codebase for similar code)
+- [ ] File sizes within limits (components <300 lines)
+- [ ] Shared utilities used (not reinventing the wheel)
+- [ ] Caching strategy implemented (React Query with appropriate staleTime)
+- [ ] Pagination implemented (for lists of data)
+- [ ] Error handling comprehensive (all async operations handled)
+- [ ] Performance considered (memoization, lazy loading where needed)
+- [ ] Consistency maintained (follows established patterns)
+- [ ] Accessibility maintained (keyboard nav, ARIA labels)
+- [ ] Security checked (input validation, XSS prevention)
+- [ ] Future-proof (extensible, configurable, abstracted dependencies)
+
+### 15. Refactoring Guidelines
+- **Refactor when**:
+  - Code duplication detected (DRY violation)
+  - File exceeds size limits
+  - Component does multiple things (SRP violation)
+  - Performance issues identified
+  - Code becomes hard to test
+- **Refactor incrementally**: Small, focused PRs, don't change everything at once
+- **Maintain tests**: Ensure tests still pass after refactoring
+- **Document changes**: Explain why refactoring was needed
+
+---
+
+## Long File & Component Organization Patterns
+
+### 1. Component Splitting Strategy
+```typescript
+// ❌ BAD: 500+ line component doing everything
+const HostDashboard = () => {
+  // 100 lines of state
+  // 200 lines of effects
+  // 200 lines of render logic
+};
+
+// ✅ GOOD: Split into focused components/hooks
+const HostDashboard = () => {
+  const { listings, isLoading } = useHostListings();
+  const { bookings } = useHostBookings();
+  
+  return (
+    <DashboardLayout>
+      <ListingsSection listings={listings} isLoading={isLoading} />
+      <BookingsSection bookings={bookings} />
+    </DashboardLayout>
+  );
+};
+
+// Separate files:
+// - useHostListings.ts (hook)
+// - useHostBookings.ts (hook)
+// - ListingsSection.tsx (component)
+// - BookingsSection.tsx (component)
+```
+
+### 2. Large File Organization
+When file grows large, split by:
+- **Feature/domain**: Group related functionality
+- **Concerns**: Separate data fetching, business logic, presentation
+- **Lifecycle**: Separate initialization, updates, cleanup logic
+
+```
+// ❌ BAD: Everything in one file
+ListingsPage.tsx (800 lines)
+
+// ✅ GOOD: Organized by concern
+ListingsPage/
+  ├── index.tsx (main component, 100 lines)
+  ├── hooks/
+  │   ├── useListings.ts
+  │   ├── useListingFilters.ts
+  │   └── useListingActions.ts
+  │
+  ├── components/
+  │   ├── ListingCard.tsx
+  │   ├── ListingFilters.tsx
+  │   └── ListingActions.tsx
+  │
+  ├── types.ts
+  └── utils.ts
+```
+
+### 3. Redundant Component Detection
+- **Before creating component**: Search for similar existing components
+- **Check component library**: `/components/ui` and `/components/common`
+- **Pattern matching**: If component is 80%+ similar, extend existing
+- **Composition over duplication**: Build from smaller pieces
+
+---
+
+**Remember**: These rules ensure production-quality code. When in doubt, prioritize:
+1. **Correctness** (works correctly)
+2. **Scalability** (handles growth)
+3. **Maintainability** (easy to understand and modify)
+4. **Performance** (fast and efficient)
+5. **Security** (safe from vulnerabilities)
+6. **Consistency** (follows established patterns)

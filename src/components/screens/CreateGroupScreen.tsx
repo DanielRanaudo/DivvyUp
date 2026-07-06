@@ -5,17 +5,15 @@ import { T, inputStyle, labelStyle } from "@/lib/tokens";
 
 interface CreateGroupScreenProps {
   onBack: () => void;
-  onCreate: (groupName: string, userName: string, venmo: string) => void;
+  onCreate: (groupName: string) => void;
 }
 
 export default function CreateGroupScreen({
   onBack,
   onCreate,
 }: CreateGroupScreenProps) {
-  const [name, setName] = useState("");
-  const [venmo, setVenmo] = useState("");
   const [groupName, setGroupName] = useState("");
-  const canSubmit = name.trim() && groupName.trim();
+  const canSubmit = groupName.trim();
 
   return (
     <div style={{ maxWidth: 400, margin: "0 auto", padding: "48px 24px" }}>
@@ -69,29 +67,8 @@ export default function CreateGroupScreen({
             style={inputStyle}
           />
         </div>
-        <div>
-          <label style={labelStyle}>Your Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Daniel"
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Venmo / Zelle</label>
-          <input
-            value={venmo}
-            onChange={(e) => setVenmo(e.target.value)}
-            placeholder="@danielv (optional)"
-            style={inputStyle}
-          />
-        </div>
         <button
-          onClick={() =>
-            canSubmit &&
-            onCreate(groupName.trim(), name.trim(), venmo.trim())
-          }
+          onClick={() => canSubmit && onCreate(groupName.trim())}
           style={{
             padding: "14px 24px",
             borderRadius: T.radius,

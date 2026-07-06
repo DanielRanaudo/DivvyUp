@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { T, inputStyle, labelStyle, cardStyle, secTitle } from "@/lib/tokens";
 import { uid } from "@/lib/utils";
+import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
 import type { Group } from "@/lib/types";
 import Avatar from "@/components/Avatar";
 
@@ -94,8 +95,14 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
           <label style={labelStyle}>Total Monthly Rent</label>
           <input
             type="number"
+            min={0}
+            step="0.01"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              if (isNonNegativeInput(e.target.value))
+                setAmount(e.target.value);
+            }}
+            onKeyDown={blockNegativeKeys}
             placeholder="0.00"
             style={{
               ...inputStyle,
@@ -205,13 +212,17 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                 </span>
                 <input
                   type="number"
+                  min={0}
+                  step="0.01"
                   value={percentages[m.id] || ""}
-                  onChange={(e) =>
-                    setPercentages((p) => ({
-                      ...p,
-                      [m.id]: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => {
+                    if (isNonNegativeInput(e.target.value))
+                      setPercentages((p) => ({
+                        ...p,
+                        [m.id]: e.target.value,
+                      }));
+                  }}
+                  onKeyDown={blockNegativeKeys}
                   placeholder="0"
                   style={{
                     ...inputStyle,
@@ -290,13 +301,17 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                 </span>
                 <input
                   type="number"
+                  min={0}
+                  step="0.01"
                   value={customs[m.id] || ""}
-                  onChange={(e) =>
-                    setCustoms((p) => ({
-                      ...p,
-                      [m.id]: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => {
+                    if (isNonNegativeInput(e.target.value))
+                      setCustoms((p) => ({
+                        ...p,
+                        [m.id]: e.target.value,
+                      }));
+                  }}
+                  onKeyDown={blockNegativeKeys}
                   placeholder="0"
                   style={{
                     ...inputStyle,

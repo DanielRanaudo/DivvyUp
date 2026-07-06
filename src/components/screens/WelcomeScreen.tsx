@@ -5,9 +5,19 @@ import { T } from "@/lib/tokens";
 interface WelcomeScreenProps {
   onStart: () => void;
   onJoin: () => void;
+  onLogout?: () => void;
+  groups?: { id: string; name: string }[];
+  onEnterGroup?: (id: string) => void;
 }
 
-export default function WelcomeScreen({ onStart, onJoin }: WelcomeScreenProps) {
+export default function WelcomeScreen({
+  onStart,
+  onJoin,
+  onLogout,
+  groups = [],
+  onEnterGroup,
+}: WelcomeScreenProps) {
+  const hasGroups = groups.length > 0 && !!onEnterGroup;
   return (
     <div
       style={{
@@ -18,8 +28,28 @@ export default function WelcomeScreen({ onStart, onJoin }: WelcomeScreenProps) {
         minHeight: "90vh",
         padding: 32,
         textAlign: "center",
+        position: "relative",
       }}
     >
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            background: "none",
+            border: "none",
+            color: T.secondary,
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: 500,
+            fontFamily: T.font,
+          }}
+        >
+          Log out
+        </button>
+      )}
       <div
         style={{
           width: 64,
@@ -66,6 +96,65 @@ export default function WelcomeScreen({ onStart, onJoin }: WelcomeScreenProps) {
       >
         Split expenses with your roommates, effortlessly.
       </p>
+      {hasGroups && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            width: "100%",
+            maxWidth: 320,
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: T.tertiary,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              textAlign: "left",
+            }}
+          >
+            Your groups
+          </div>
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => onEnterGroup!(g.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%",
+                padding: "14px 18px",
+                borderRadius: T.radius,
+                border: "none",
+                background: T.cardSolid,
+                boxShadow: T.shadow,
+                color: T.text,
+                fontFamily: T.font,
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {g.name}
+              </span>
+              <span style={{ color: T.tertiary, fontSize: 18 }}>›</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div
         style={{
           display: "flex",

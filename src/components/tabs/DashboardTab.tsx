@@ -2,7 +2,8 @@
 
 import { T, cardStyle } from "@/lib/tokens";
 import { calcSettlements } from "@/lib/settlements";
-import type { Group, Member, Charge } from "@/lib/types";
+import { groupChores, completeChore } from "@/lib/chores";
+import type { Group, Member, Charge, Chore } from "@/lib/types";
 import Avatar from "@/components/Avatar";
 import NotificationBanner from "@/components/NotificationBanner";
 
@@ -51,14 +52,192 @@ export default function DashboardTab({
   const totalOwedToMe = owedToMe.reduce((s, x) => s + x.amount, 0);
   const netBalance = totalOwedToMe - totalIOwe;
 
-  return (
-    <div>
-      <NotificationBanner
-        notifications={myNotifications}
-        onAction={handlePaymentAction}
-        group={group}
-      />
+  const chores = group.chores ?? [];
+  const memberById: Record<string, Member> = {};
+  group.members.forEach((m) => (memberById[m.id] = m));
+  const groupedChores = groupChores(chores);
 
+  const markChoreDone = (choreId: string) => {
+    setGroup((prev) => ({
+      ...prev,
+      chores: (prev.chores ?? []).map((c) =>
+        c.id === choreId ? completeChore(c) : c
+      ),
+    }));
+  };
+
+  const formatChoreDate = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const choreSections: {
+    key: "overdue" | "today" | "upcoming";
+    label: string;
+    accent: string;
+    items: Chore[];
+  }[] = [
+    { key: "overdue", label: "Overdue", accent: T.red, items: groupedChores.overdue },
+    { key: "today", label: "Today", accent: T.blue, items: groupedChores.today },
+    {
+      key: "upcoming",
+      label: "Upcoming",
+      accent: T.secondary,
+      items: groupedChores.upcoming,
+    },
+  ];
+
+  const choresColumn = (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 10,
+        }}
+      >
+        <h3
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.secondary,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            margin: 0,
+          }}
+        >
+          Chores
+        </h3>
+        <button
+          onClick={() => setTab("chores")}
+          style={{
+            background: "none",
+            border: "none",
+            color: T.blue,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.font,
+            padding: 0,
+          }}
+        >
+          View all
+        </button>
+      </div>
+
+      {chores.length === 0 ? (
+        <div
+          style={{
+            ...cardStyle,
+            textAlign: "center",
+            color: T.tertiary,
+            fontSize: 14,
+            padding: 24,
+          }}
+        >
+          No chores yet
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {choreSections.map(({ key, label, accent, items }) => {
+            if (items.length === 0) return null;
+            return (
+              <div key={key}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: accent,
+                    marginBottom: 6,
+                    paddingLeft: 2,
+                  }}
+                >
+                  {label}
+                </div>
+                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                  {items.map((chore, i) => {
+                    const assignee = memberById[chore.assigneeId];
+                    const isMine = chore.assigneeId === currentUser.id;
+                    return (
+                      <div
+                        key={chore.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderLeft: `3px solid ${accent}`,
+                          borderBottom:
+                            i < items.length - 1
+                              ? `1px solid ${T.border}`
+                              : "none",
+                        }}
+                      >
+                        <div style={{ fontSize: 18 }}>{chore.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 500,
+                              fontSize: 14,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {chore.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: T.tertiary,
+                              marginTop: 1,
+                            }}
+                          >
+                            {assignee
+                              ? isMine
+                                ? "You"
+                                : assignee.name
+                              : "Unassigned"}{" "}
+                            · {formatChoreDate(chore.nextDue)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => markChoreDone(chore.id)}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 16,
+                            border: "none",
+                            background: T.green,
+                            color: "#fff",
+                            fontFamily: T.font,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            flexShrink: 0,
+                          }}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const mainColumn = (
+    <div>
       {/* Hero balance */}
       <div
         style={{
@@ -434,7 +613,9 @@ export default function DashboardTab({
                           ? "rgba(255,149,0,0.1)"
                           : c.type === "utility"
                             ? "rgba(0,122,255,0.1)"
-                            : "rgba(88,86,214,0.1)",
+                            : c.type === "subgroup"
+                              ? "rgba(175,82,222,0.1)"
+                              : "rgba(88,86,214,0.1)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -445,7 +626,9 @@ export default function DashboardTab({
                       ? "🏠"
                       : c.type === "utility"
                         ? "⚡"
-                        : "🛒"}
+                        : c.type === "subgroup"
+                          ? "🧻"
+                          : "🛒"}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>
@@ -466,7 +649,9 @@ export default function DashboardTab({
                     <div style={{ fontSize: 12, color: T.tertiary }}>
                       {c.type === "expense"
                         ? `by ${c.submittedByName}`
-                        : "Treasurer"}
+                        : c.type === "subgroup"
+                          ? `${c.subgroupName} · paid by ${c.submittedByName}`
+                          : "Treasurer"}
                     </div>
                   </div>
                   <div
@@ -483,6 +668,20 @@ export default function DashboardTab({
           </div>
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <div>
+      <NotificationBanner
+        notifications={myNotifications}
+        onAction={handlePaymentAction}
+        group={group}
+      />
+      <div className="dashboard-grid">
+        {mainColumn}
+        {choresColumn}
+      </div>
     </div>
   );
 }

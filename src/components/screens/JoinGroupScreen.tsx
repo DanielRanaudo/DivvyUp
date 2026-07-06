@@ -7,21 +7,37 @@ import type { Group } from "@/lib/types";
 interface JoinGroupScreenProps {
   onBack: () => void;
   onJoin: (groupId: string, name: string, venmo: string) => void;
+  onJoinCode?: (
+    code: string,
+    name: string,
+    venmo: string
+  ) => Promise<string | null>;
   groups: Group[];
 }
 
 export default function JoinGroupScreen({
   onBack,
   onJoin,
+  onJoinCode,
   groups,
 }: JoinGroupScreenProps) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [venmo, setVenmo] = useState("");
   const [error, setError] = useState("");
-  const canSubmit = code.trim().length === 6 && name.trim();
+  const [busy, setBusy] = useState(false);
+  const canSubmit = code.trim().length === 6 && name.trim() && !busy;
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
+    if (onJoinCode) {
+      setBusy(true);
+      setError("");
+      const err = await onJoinCode(code.trim(), name.trim(), venmo.trim());
+      if (err) setError(err);
+      setBusy(false);
+      return;
+    }
+
     const g = groups.find(
       (g) => g.code === code.trim().toUpperCase()
     );

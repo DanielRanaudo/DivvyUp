@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { T, inputStyle, labelStyle, cardStyle, secTitle } from "@/lib/tokens";
 import { uid } from "@/lib/utils";
+import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
 import type { Group } from "@/lib/types";
 
 interface UtilitiesTabProps {
@@ -101,8 +102,14 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
               <label style={labelStyle}>Amount</label>
               <input
                 type="number"
+                min={0}
+                step="0.01"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  if (isNonNegativeInput(e.target.value))
+                    setAmount(e.target.value);
+                }}
+                onKeyDown={blockNegativeKeys}
                 placeholder="0.00"
                 style={inputStyle}
               />

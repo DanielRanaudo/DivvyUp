@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { T, cardStyle, secTitle } from "@/lib/tokens";
-import type { Group, Member } from "@/lib/types";
+import type { Group, Member, Charge } from "@/lib/types";
+import {
+  calcSimpleSettlements,
+  calcSmartSettlements,
+} from "@/lib/settlements";
 import Avatar from "@/components/Avatar";
 
 interface MembersTabProps {
@@ -10,6 +14,7 @@ interface MembersTabProps {
   setGroup: (updater: (prev: Group) => Group) => void;
   currentUser: Member;
   isTreasurer: boolean;
+  allCharges: Charge[];
 }
 
 export default function MembersTab({
@@ -17,7 +22,19 @@ export default function MembersTab({
   setGroup,
   currentUser,
   isTreasurer,
+  allCharges,
 }: MembersTabProps) {
+  const simpleCount = calcSimpleSettlements(
+    group.members,
+    allCharges,
+    group.payments
+  ).length;
+  const smartCount = calcSmartSettlements(
+    group.members,
+    allCharges,
+    group.payments
+  ).length;
+  const paymentsSaved = simpleCount - smartCount;
   const [copied, setCopied] = useState(false);
   const [confirmKick, setConfirmKick] = useState<string | null>(null);
 
@@ -33,6 +50,10 @@ export default function MembersTab({
       ...prev,
       members: prev.members.filter((m) => m.id !== id),
       expenses: prev.expenses.filter((e) => e.submittedBy !== id),
+      subgroups: (prev.subgroups ?? []).map((s) => ({
+        ...s,
+        memberIds: s.memberIds.filter((mid) => mid !== id),
+      })),
     }));
     setConfirmKick(null);
   };
@@ -250,7 +271,7 @@ export default function MembersTab({
                     ? "Debts are optimized across the group to minimize total payments. Fewer Venmo requests, less hassle for everyone."
                     : "Each expense creates a direct debt to whoever paid. Easier to trace where each charge comes from."}
                 </div>
-                {!group.smartSettle && (
+                {!group.smartSettle && paymentsSaved > 0 && (
                   <div
                     style={{
                       fontSize: 13,
@@ -259,9 +280,9 @@ export default function MembersTab({
                       fontWeight: 500,
                     }}
                   >
-                    Turning this on can reduce{" "}
-                    {group.members.length * 2}+ payments down to{" "}
-                    {group.members.length - 1} or fewer
+                    Turning this on would cut settle-up from {simpleCount} payment
+                    {simpleCount === 1 ? "" : "s"} to {smartCount} payment
+                    {smartCount === 1 ? "" : "s"}
                   </div>
                 )}
               </div>
