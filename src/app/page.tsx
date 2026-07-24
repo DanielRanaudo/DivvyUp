@@ -554,7 +554,7 @@ export default function DivvyUp() {
       {screen === "app" && group && currentUser && (
         <div
           style={{
-            maxWidth: tab === "dashboard" ? 900 : 560,
+            maxWidth: 900,
             margin: "0 auto",
             padding: "12px 20px",
             paddingBottom: 80,
@@ -741,60 +741,67 @@ export default function DivvyUp() {
             onChange={setTab}
           />
 
-          {tab === "dashboard" && (
-            <DashboardTab
-              group={group}
-              currentUser={currentUser}
-              allCharges={allCharges}
-              setGroup={setGroup}
-              setTab={setTab}
-            />
-          )}
-          {tab === "rent" && isTreasurer && (
-            <RentTab group={group} setGroup={setGroup} />
-          )}
-          {tab === "utilities" && isTreasurer && (
-            <UtilitiesTab group={group} setGroup={setGroup} />
-          )}
-          {tab === "expenses" && (
-            <ExpensesTab
-              group={group}
-              setGroup={setGroup}
-              currentUser={currentUser}
-              isTreasurer={isTreasurer}
-            />
-          )}
-          {tab === "subgroups" && (
-            <SubgroupsTab
-              group={group}
-              setGroup={setGroup}
-              currentUser={currentUser}
-            />
-          )}
-          {tab === "chores" && (
-            <ChoresTab
-              group={group}
-              setGroup={setGroup}
-              currentUser={currentUser}
-            />
-          )}
-          {tab === "settle" && (
-            <SettleTab
-              group={group}
-              setGroup={setGroup}
-              allCharges={allCharges}
-              currentUser={currentUser}
-            />
-          )}
-          {tab === "members" && (
-            <MembersTab
-              group={group}
-              setGroup={setGroup}
-              currentUser={currentUser}
-              isTreasurer={isTreasurer}
-              allCharges={allCharges}
-            />
-          )}
+          <div
+            style={{
+              maxWidth: tab === "dashboard" ? "none" : 560,
+              margin: "0 auto",
+            }}
+          >
+            {tab === "dashboard" && (
+              <DashboardTab
+                group={group}
+                currentUser={currentUser}
+                allCharges={allCharges}
+                setGroup={setGroup}
+                setTab={setTab}
+              />
+            )}
+            {tab === "rent" && isTreasurer && (
+              <RentTab group={group} setGroup={setGroup} />
+            )}
+            {tab === "utilities" && isTreasurer && (
+              <UtilitiesTab group={group} setGroup={setGroup} />
+            )}
+            {tab === "expenses" && (
+              <ExpensesTab
+                group={group}
+                setGroup={setGroup}
+                currentUser={currentUser}
+                isTreasurer={isTreasurer}
+              />
+            )}
+            {tab === "subgroups" && (
+              <SubgroupsTab
+                group={group}
+                setGroup={setGroup}
+                currentUser={currentUser}
+              />
+            )}
+            {tab === "chores" && (
+              <ChoresTab
+                group={group}
+                setGroup={setGroup}
+                currentUser={currentUser}
+              />
+            )}
+            {tab === "settle" && (
+              <SettleTab
+                group={group}
+                setGroup={setGroup}
+                allCharges={allCharges}
+                currentUser={currentUser}
+              />
+            )}
+            {tab === "members" && (
+              <MembersTab
+                group={group}
+                setGroup={setGroup}
+                currentUser={currentUser}
+                isTreasurer={isTreasurer}
+                allCharges={allCharges}
+              />
+            )}
+          </div>
 
           {IS_SANDBOX && (
             <UserSwitcher
