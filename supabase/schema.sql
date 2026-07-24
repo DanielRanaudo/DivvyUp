@@ -445,14 +445,20 @@ grant execute on function public.update_group_docs(uuid, jsonb, jsonb) to authen
 
 -- ---------------------------------------------------------------------------
 -- 8. Storage: receipt images
---    Objects are stored as {group_id}/{uuid}.jpg. The bucket is public for
+--    Objects are stored as {group_id}/{uuid}.{jpg|pdf}. The bucket is public for
 --    reads (URLs are unguessable UUIDs); uploads/deletes require membership
 --    in the group whose folder is being written to.
 -- ---------------------------------------------------------------------------
 
-insert into storage.buckets (id, name, public)
-values ('receipts', 'receipts', true)
-on conflict (id) do update set public = true;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'receipts', 'receipts', true, 10485760,
+  array['image/png', 'image/jpeg', 'application/pdf']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = 10485760,
+  allowed_mime_types = array['image/png', 'image/jpeg', 'application/pdf'];
 
 drop policy if exists receipts_select on storage.objects;
 create policy receipts_select on storage.objects

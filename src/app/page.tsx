@@ -42,6 +42,12 @@ export default function DivvyUp() {
   );
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  // Mirror of activeGroupId so effects can read the latest selection without
+  // listing it as a dependency (which would re-run them on every group switch).
+  const activeGroupIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeGroupIdRef.current = activeGroupId;
+  }, [activeGroupId]);
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
   const [myMemberIds, setMyMemberIds] = useState<Record<string, string>>({});
   const [dataLoading, setDataLoading] = useState(USE_BACKEND);
@@ -155,10 +161,16 @@ export default function DivvyUp() {
           Object.fromEntries(loaded.map((l) => [l.group.id, l.myMemberId]))
         );
         if (loaded.length > 0) {
-          const first = loaded[0];
-          setActiveGroupId(first.group.id);
+          // Preserve the group the user is currently viewing across re-fetches
+          // (e.g. a token refresh). Only fall back to the first group when there
+          // is no valid current selection, so the treasurer isn't yanked away.
+          const currentId = activeGroupIdRef.current;
+          const selected =
+            loaded.find((l) => l.group.id === currentId) ?? loaded[0];
+          setActiveGroupId(selected.group.id);
           setCurrentUser(
-            first.group.members.find((m) => m.id === first.myMemberId) ?? null
+            selected.group.members.find((m) => m.id === selected.myMemberId) ??
+              null
           );
           setScreen("app");
         } else {
@@ -172,7 +184,10 @@ export default function DivvyUp() {
     return () => {
       active = false;
     };
-  }, [supabase, session]);
+    // Keyed on the user id (not the whole session object) so a token refresh
+    // doesn't trigger a full reload that would reset the active group.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, session?.user?.id]);
 
   // Realtime: when anything in the active group changes on the server,
   // refetch it so every roommate stays in sync live.

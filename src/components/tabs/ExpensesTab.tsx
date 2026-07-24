@@ -6,9 +6,20 @@ import { uid } from "@/lib/utils";
 import { USE_BACKEND } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
 import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
-import { fileToCompressedDataURL, fileToCompressedBlob } from "@/lib/image";
-import { uploadReceipts } from "@/lib/receipts";
+import {
+  fileToCompressedDataURL,
+  fileToCompressedBlob,
+  fileToDataURL,
+} from "@/lib/image";
+import { uploadReceipts, type ReceiptUpload } from "@/lib/receipts";
 import type { Group, Member } from "@/lib/types";
+
+const ACCEPTED_TYPES = ["image/png", "image/jpeg", "application/pdf"];
+
+/** True when a stored receipt (public URL or data URL) is a PDF, not an image. */
+function isPdfReceipt(src: string): boolean {
+  return /\.pdf(?:$|\?)/i.test(src) || src.startsWith("data:application/pdf");
+}
 
 interface ExpensesTabProps {
   group: Group;
@@ -42,12 +53,30 @@ function ReceiptThumbs({
         flexShrink: 0,
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={images[0]}
-        alt="Receipt"
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
+      {isPdfReceipt(images[0]) ? (
+        <span
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            fontWeight: 700,
+            color: T.red,
+            background: T.bg,
+          }}
+        >
+          PDF
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={images[0]}
+          alt="Receipt"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
       {images.length > 1 && (
         <span
           style={{
@@ -91,25 +120,43 @@ export default function ExpensesTab({
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    if (files.length === 0) return;
+    const all = Array.from(fileList);
+    const files = all.filter((f) => ACCEPTED_TYPES.includes(f.type));
+    if (files.length === 0) {
+      setUploadError("Only PNG, JPG, or PDF files are allowed.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
-    setUploadError("");
+    setUploadError(
+      files.length < all.length ? "Some files were skipped (PNG, JPG, PDF only)." : ""
+    );
     try {
       if (supabase) {
-        // Backend mode: upload compressed images to Supabase Storage and
-        // keep only the public URLs (base64 in the DB bloats every fetch).
-        const blobs = await Promise.all(
-          files.map((f) => fileToCompressedBlob(f))
+        // Backend mode: upload to Supabase Storage and keep only the public
+        // URLs (base64 in the DB bloats every fetch). Images are compressed to
+        // JPEG; PDFs are uploaded as-is.
+        const uploads: ReceiptUpload[] = await Promise.all(
+          files.map(async (f) =>
+            f.type === "application/pdf"
+              ? { blob: f, ext: "pdf", contentType: "application/pdf" }
+              : {
+                  blob: await fileToCompressedBlob(f),
+                  ext: "jpg",
+                  contentType: "image/jpeg",
+                }
+          )
         );
-        const urls = await uploadReceipts(supabase, group.id, blobs);
+        const urls = await uploadReceipts(supabase, group.id, uploads);
         setImages((prev) => [...prev, ...urls]);
       } else {
-        // Sandbox/local mode: no storage, keep images in memory.
+        // Sandbox/local mode: no storage, keep receipts in memory as data URLs.
         const encoded = await Promise.all(
-          files.map((f) => fileToCompressedDataURL(f))
+          files.map((f) =>
+            f.type === "application/pdf"
+              ? fileToDataURL(f)
+              : fileToCompressedDataURL(f)
+          )
         );
         setImages((prev) => [...prev, ...encoded]);
       }
@@ -240,7 +287,7 @@ export default function ExpensesTab({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,application/pdf"
               multiple
               onChange={(e) => handleFiles(e.target.files)}
               style={{ display: "none" }}
@@ -258,20 +305,43 @@ export default function ExpensesTab({
                   key={i}
                   style={{ position: "relative", width: 64, height: 64 }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={`Receipt ${i + 1}`}
-                    onClick={() => setViewImage(src)}
-                    style={{
-                      width: 64,
-                      height: 64,
-                      objectFit: "cover",
-                      borderRadius: T.radiusSm,
-                      cursor: "pointer",
-                      border: `1px solid ${T.border}`,
-                    }}
-                  />
+                  {isPdfReceipt(src) ? (
+                    <button
+                      onClick={() => setViewImage(src)}
+                      aria-label={`View receipt ${i + 1} (PDF)`}
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: T.radiusSm,
+                        border: `1px solid ${T.border}`,
+                        background: T.bg,
+                        color: T.red,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      PDF
+                    </button>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={src}
+                      alt={`Receipt ${i + 1}`}
+                      onClick={() => setViewImage(src)}
+                      style={{
+                        width: 64,
+                        height: 64,
+                        objectFit: "cover",
+                        borderRadius: T.radiusSm,
+                        cursor: "pointer",
+                        border: `1px solid ${T.border}`,
+                      }}
+                    />
+                  )}
                   <button
                     onClick={() => removeImage(i)}
                     aria-label="Remove receipt"
@@ -564,18 +634,34 @@ export default function ExpensesTab({
             padding: 24,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={viewImage}
-            alt="Receipt"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              borderRadius: T.radius,
-              boxShadow: T.shadowLg,
-            }}
-          />
+          {isPdfReceipt(viewImage) ? (
+            <iframe
+              src={viewImage}
+              title="Receipt PDF"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "none",
+                borderRadius: T.radius,
+                boxShadow: T.shadowLg,
+                background: "#fff",
+              }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={viewImage}
+              alt="Receipt"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                borderRadius: T.radius,
+                boxShadow: T.shadowLg,
+              }}
+            />
+          )}
           <button
             onClick={() => setViewImage(null)}
             aria-label="Close"

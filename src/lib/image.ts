@@ -7,6 +7,14 @@ const DEFAULT_MAX_DIM = 1200;
 const DEFAULT_QUALITY = 0.7;
 
 /**
+ * Reads any File and returns its raw data URL, unmodified. Used for receipt
+ * types we don't (or can't) compress client-side, e.g. PDFs.
+ */
+export function fileToDataURL(file: File): Promise<string> {
+  return readAsDataURL(file);
+}
+
+/**
  * Reads an image File and returns a downscaled, JPEG-compressed data URL.
  * Used in sandbox/local mode where images live in memory instead of storage.
  * Falls back to the raw data URL if canvas processing fails.

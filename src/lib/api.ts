@@ -115,7 +115,10 @@ export async function fetchMyGroups(
   supabase: SupabaseClient,
   myUserId: string
 ): Promise<LoadedGroup[]> {
-  const { data, error } = await supabase.from("groups").select(GROUP_SELECT);
+  const { data, error } = await supabase
+    .from("groups")
+    .select(GROUP_SELECT)
+    .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((row: any) => {

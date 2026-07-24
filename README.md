@@ -29,6 +29,28 @@ Open [http://localhost:3000](http://localhost:3000).
    `/reset-password` as a redirect URL so password-reset emails work.
 5. `npm run dev` — the app now requires sign-in and persists to Supabase.
 
+## Production Email (Resend SMTP)
+
+Supabase's built-in email sender is limited to ~2 emails/hour and is not meant
+for production. Auth emails (signup confirmation, password reset) should be
+delivered through [Resend](https://resend.com) instead. No code changes are
+needed — Supabase generates the emails and Resend delivers them:
+
+1. Create a Resend account and verify a domain you own
+   (**Domains → Add Domain**, then add the SPF/DKIM DNS records it shows).
+   Without a verified domain, Resend only delivers to your own address.
+2. Create an API key (**API Keys → Create**, sending access is enough).
+3. In Supabase: **Authentication → Emails → SMTP Settings**, enable
+   **Custom SMTP** with:
+   - Host: `smtp.resend.com`
+   - Port: `465`
+   - Username: `resend`
+   - Password: your `re_...` API key
+   - Sender: `no-reply@yourdomain.com` + a sender name
+4. Review **Authentication → Rate Limits** (email defaults to 30/hour once
+   custom SMTP is on) and optionally restyle the templates under
+   **Authentication → Emails → Templates**.
+
 ## Scripts
 
 | Script | Purpose |
