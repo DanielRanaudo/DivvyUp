@@ -6,25 +6,21 @@ import { uid } from "@/lib/utils";
 import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
 import {
   todayISO,
-  groupChores,
+  addDaysISO,
   completeChore,
   nextAssigneeId,
-  type ChoreStatus,
+  choreStatus,
+  projectOccurrences,
 } from "@/lib/chores";
 import type { Group, Member, Chore } from "@/lib/types";
 import Avatar from "@/components/Avatar";
+import ChoreCalendar from "@/components/ChoreCalendar";
 
 interface ChoresTabProps {
   group: Group;
   setGroup: (updater: (prev: Group) => Group) => void;
   currentUser: Member;
 }
-
-const SECTION_META: { key: ChoreStatus; label: string; accent: string }[] = [
-  { key: "overdue", label: "Overdue", accent: T.red },
-  { key: "today", label: "Today", accent: T.blue },
-  { key: "upcoming", label: "Upcoming", accent: T.secondary },
-];
 
 export default function ChoresTab({
   group,
@@ -105,7 +101,18 @@ export default function ChoresTab({
     }));
   };
 
-  const grouped = groupChores(chores);
+  const today = todayISO();
+  const tomorrow = addDaysISO(today, 1);
+
+  // "Today" is the shared board: every chore due today or overdue, so the
+  // household can see what still needs doing. "Upcoming" is a personal
+  // heads-up: only the chores the current user is handed tomorrow.
+  const todayItems = chores
+    .filter((c) => c.nextDue <= today)
+    .sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+  const upcomingMine = projectOccurrences(chores, tomorrow, tomorrow).filter(
+    (o) => o.assigneeId === currentUser.id
+  );
 
   const formatDate = (iso: string) => {
     const [y, m, d] = iso.split("-").map(Number);
@@ -119,6 +126,7 @@ export default function ChoresTab({
   const renderRow = (chore: Chore, accent: string) => {
     const assignee = memberById[chore.assigneeId];
     const isMine = chore.assigneeId === currentUser.id;
+    const overdue = choreStatus(chore) === "overdue";
     const upNextId = nextAssigneeId(chore);
     const showUpNext =
       chore.assignMode === "rotation" &&
@@ -184,7 +192,13 @@ export default function ChoresTab({
             )}
             <span style={{ fontSize: 13, color: T.tertiary }}>
               {assignee ? (isMine ? "You" : assignee.name) : "Unassigned"} ·{" "}
-              {formatDate(chore.nextDue)}
+              {overdue ? (
+                <span style={{ color: T.red, fontWeight: 600 }}>
+                  Overdue · {formatDate(chore.nextDue)}
+                </span>
+              ) : (
+                formatDate(chore.nextDue)
+              )}
             </span>
           </div>
           {showUpNext && memberById[upNextId] && (
@@ -195,16 +209,18 @@ export default function ChoresTab({
         </div>
         <button
           onClick={() => markDone(chore.id)}
+          disabled={!isMine}
+          title={isMine ? undefined : "Only the assigned roommate can mark this done"}
           style={{
             padding: "7px 14px",
             borderRadius: 20,
             border: "none",
-            background: T.green,
-            color: "#fff",
+            background: isMine ? T.green : T.bg,
+            color: isMine ? "#fff" : T.tertiary,
             fontFamily: T.font,
             fontSize: 13,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: isMine ? "pointer" : "not-allowed",
           }}
         >
           Done
@@ -226,6 +242,44 @@ export default function ChoresTab({
       </div>
     );
   };
+
+  const renderUpcomingRow = (
+    occ: ReturnType<typeof projectOccurrences>[number],
+    isLast: boolean
+  ) => (
+    <div
+      key={occ.choreId}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "14px 18px",
+        borderLeft: `3px solid ${T.secondary}`,
+        borderBottom: isLast ? "none" : `1px solid ${T.border}`,
+      }}
+    >
+      <div
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          background: "rgba(0,0,0,0.04)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 19,
+        }}
+      >
+        {occ.icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, fontSize: 15 }}>{occ.name}</div>
+        <div style={{ fontSize: 13, color: T.tertiary, marginTop: 4 }}>
+          Yours tomorrow · {formatDate(occ.date)}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -262,7 +316,7 @@ export default function ChoresTab({
       </div>
 
       {showForm && (
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div style={{ ...cardStyle, marginBottom: 20, maxWidth: 560 }}>
           <div
             style={{
               display: "grid",
@@ -450,44 +504,100 @@ export default function ChoresTab({
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {SECTION_META.map(({ key, label, accent }) => {
-          const items = grouped[key];
-          if (items.length === 0) return null;
-          return (
-            <div key={key}>
+      {chores.length > 0 && (
+        <div className="chores-grid">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div>
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 600,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
-                  color: accent,
+                  color: T.blue,
                   marginBottom: 8,
                   paddingLeft: 4,
                 }}
               >
-                {label}
+                Today
               </div>
-              <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-                {items.map((chore, i) => (
-                  <div
-                    key={chore.id}
-                    style={{
-                      borderBottom:
-                        i < items.length - 1
-                          ? `1px solid ${T.border}`
-                          : "none",
-                    }}
-                  >
-                    {renderRow(chore, accent)}
-                  </div>
-                ))}
-              </div>
+              {todayItems.length === 0 ? (
+                <div
+                  style={{
+                    ...cardStyle,
+                    textAlign: "center",
+                    color: T.tertiary,
+                    fontSize: 14,
+                  }}
+                >
+                  Nothing due today
+                </div>
+              ) : (
+                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                  {todayItems.map((chore, i) => (
+                    <div
+                      key={chore.id}
+                      style={{
+                        borderBottom:
+                          i < todayItems.length - 1
+                            ? `1px solid ${T.border}`
+                            : "none",
+                      }}
+                    >
+                      {renderRow(
+                        chore,
+                        choreStatus(chore) === "overdue" ? T.red : T.blue
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          );
-        })}
-      </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: T.secondary,
+                  marginBottom: 8,
+                  paddingLeft: 4,
+                }}
+              >
+                Tomorrow · your chores
+              </div>
+              {upcomingMine.length === 0 ? (
+                <div
+                  style={{
+                    ...cardStyle,
+                    textAlign: "center",
+                    color: T.tertiary,
+                    fontSize: 14,
+                  }}
+                >
+                  No chores assigned to you tomorrow
+                </div>
+              ) : (
+                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                  {upcomingMine.map((occ, i) =>
+                    renderUpcomingRow(occ, i === upcomingMine.length - 1)
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ ...cardStyle }}>
+            <ChoreCalendar
+              chores={chores}
+              members={group.members}
+              currentUser={currentUser}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

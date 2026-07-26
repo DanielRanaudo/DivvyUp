@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { T } from "@/lib/tokens";
 import { uid, groupCode } from "@/lib/utils";
-import { IS_SANDBOX, USE_BACKEND } from "@/lib/config";
+import { IS_SANDBOX, USE_BACKEND, SIDEBAR_NAV } from "@/lib/config";
 import { useAuth } from "@/context/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -11,6 +11,7 @@ import {
   fetchGroup,
   createGroup,
   joinGroup,
+  leaveGroup,
   persistGroupDiff,
 } from "@/lib/api";
 import { subgroupCharges } from "@/lib/charges";
@@ -18,6 +19,8 @@ import { todayISO, addDaysISO, myOpenChoreCount } from "@/lib/chores";
 import type { Group, Member, Charge } from "@/lib/types";
 
 import TabBar from "@/components/TabBar";
+import SideNav from "@/components/SideNav";
+import GroupSwitcher from "@/components/GroupSwitcher";
 import UserSwitcher from "@/components/UserSwitcher";
 import AuthScreen from "@/components/screens/AuthScreen";
 import WelcomeScreen from "@/components/screens/WelcomeScreen";
@@ -52,7 +55,6 @@ export default function DivvyUp() {
   const [myMemberIds, setMyMemberIds] = useState<Record<string, string>>({});
   const [dataLoading, setDataLoading] = useState(USE_BACKEND);
   const [tab, setTab] = useState("dashboard");
-  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -78,8 +80,14 @@ export default function DivvyUp() {
     setActiveGroupId(gid);
     setCurrentUser(nextUser);
     setTab("dashboard");
-    setSwitcherOpen(false);
     setScreen("app");
+  };
+
+  const handleViewOtherGroups = () => {
+    setScreen("welcome");
+    setActiveGroupId(null);
+    setCurrentUser(null);
+    setTab("dashboard");
   };
 
   // On save failure: tell the user and roll the group back to server state
@@ -448,6 +456,43 @@ export default function DivvyUp() {
     { id: "members", label: "Group" },
   ];
 
+  const handleLeaveGroup = async (gid: string) => {
+    const g = groups.find((x) => x.id === gid);
+    if (!g) return;
+    if (
+      !window.confirm(
+        `Leave "${g.name}"? You'll need an invite code to rejoin.`
+      )
+    )
+      return;
+
+    if (USE_BACKEND && supabase) {
+      const memberId = myMemberIds[gid];
+      if (!memberId) {
+        showSaveError("Couldn't leave — membership not found");
+        return;
+      }
+      try {
+        await leaveGroup(supabase, memberId);
+      } catch (e) {
+        showSaveError(`Couldn't leave — ${(e as Error).message}`);
+        return;
+      }
+    }
+
+    setGroups((prev) => prev.filter((x) => x.id !== gid));
+    setMyMemberIds((prev) => {
+      const next = { ...prev };
+      delete next[gid];
+      return next;
+    });
+    if (activeGroupId === gid) {
+      setActiveGroupId(null);
+      setCurrentUser(null);
+      setTab("dashboard");
+    }
+  };
+
   const handleLogout = async () => {
     await signOut();
     setGroups([]);
@@ -549,6 +594,7 @@ export default function DivvyUp() {
           onLogout={USE_BACKEND ? handleLogout : undefined}
           groups={groups.map((g) => ({ id: g.id, name: g.name }))}
           onEnterGroup={switchGroup}
+          onLeaveGroup={handleLeaveGroup}
         />
       )}
       {screen === "create" && (
@@ -566,267 +612,192 @@ export default function DivvyUp() {
         />
       )}
 
-      {screen === "app" && group && currentUser && (
-        <div
-          style={{
-            maxWidth: 900,
-            margin: "0 auto",
-            padding: "12px 20px",
-            paddingBottom: 80,
-          }}
-        >
-          <div
-            style={{
-              padding: "12px 0 8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <div
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <h1
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 700,
-                    margin: 0,
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  divvyup
-                </h1>
-                {IS_SANDBOX && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.08em",
-                      color: "#fff",
-                      background: T.red,
-                      borderRadius: 6,
-                      padding: "2px 6px",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Sandbox
-                  </span>
-                )}
-              </div>
-              <div style={{ position: "relative", marginTop: 1 }}>
-                {groups.length > 1 ? (
-                  <button
-                    onClick={() => setSwitcherOpen((o) => !o)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      fontSize: 13,
-                      color: T.tertiary,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      fontFamily: T.font,
-                    }}
-                  >
-                    {group.name}
-                    <span style={{ fontSize: 10 }}>▾</span>
-                  </button>
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: T.tertiary,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {group.name}
-                  </div>
-                )}
-                {switcherOpen && (
-                  <>
-                    <div
-                      onClick={() => setSwitcherOpen(false)}
-                      style={{
-                        position: "fixed",
-                        inset: 0,
-                        zIndex: 40,
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "calc(100% + 6px)",
-                        left: 0,
-                        minWidth: 200,
-                        background: T.cardSolid,
-                        borderRadius: T.radiusSm,
-                        boxShadow: T.shadowLg,
-                        padding: 6,
-                        zIndex: 41,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: T.tertiary,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          padding: "6px 10px 4px",
-                        }}
-                      >
-                        Your groups
-                      </div>
-                      {groups.map((g) => {
-                        const isActive = g.id === activeGroupId;
-                        return (
-                          <button
-                            key={g.id}
-                            onClick={() => switchGroup(g.id)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 8,
-                              width: "100%",
-                              textAlign: "left",
-                              background: isActive
-                                ? "rgba(0,122,255,0.1)"
-                                : "none",
-                              border: "none",
-                              borderRadius: 8,
-                              padding: "9px 10px",
-                              fontSize: 14,
-                              fontWeight: 500,
-                              color: isActive ? T.blue : T.text,
-                              cursor: "pointer",
-                              fontFamily: T.font,
-                            }}
-                          >
-                            <span
-                              style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {g.name}
-                            </span>
-                            {isActive && (
-                              <span style={{ fontSize: 12 }}>✓</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setScreen("welcome");
-                setActiveGroupId(null);
-                setCurrentUser(null);
-                setTab("dashboard");
-              }}
+      {screen === "app" &&
+        group &&
+        currentUser &&
+        (() => {
+          const navTabs = isTreasurer ? treasurerTabs : memberTabs;
+
+          const content = (
+            <div
               style={{
-                background: T.bg,
-                border: "none",
-                borderRadius: 20,
-                padding: "7px 14px",
-                fontSize: 13,
-                color: T.secondary,
-                cursor: "pointer",
-                fontWeight: 500,
-                fontFamily: T.font,
+                maxWidth:
+                  tab === "dashboard" || tab === "chores" ? "none" : 560,
+                margin: "0 auto",
               }}
             >
-              Leave
-            </button>
-          </div>
+              {tab === "dashboard" && (
+                <DashboardTab
+                  group={group}
+                  currentUser={currentUser}
+                  allCharges={allCharges}
+                  setGroup={setGroup}
+                  setTab={setTab}
+                />
+              )}
+              {tab === "rent" && isTreasurer && (
+                <RentTab group={group} setGroup={setGroup} />
+              )}
+              {tab === "utilities" && isTreasurer && (
+                <UtilitiesTab group={group} setGroup={setGroup} />
+              )}
+              {tab === "expenses" && (
+                <ExpensesTab
+                  group={group}
+                  setGroup={setGroup}
+                  currentUser={currentUser}
+                  isTreasurer={isTreasurer}
+                />
+              )}
+              {tab === "subgroups" && (
+                <SubgroupsTab
+                  group={group}
+                  setGroup={setGroup}
+                  currentUser={currentUser}
+                />
+              )}
+              {tab === "chores" && (
+                <ChoresTab
+                  group={group}
+                  setGroup={setGroup}
+                  currentUser={currentUser}
+                />
+              )}
+              {tab === "settle" && (
+                <SettleTab
+                  group={group}
+                  setGroup={setGroup}
+                  allCharges={allCharges}
+                  currentUser={currentUser}
+                />
+              )}
+              {tab === "members" && (
+                <MembersTab
+                  group={group}
+                  setGroup={setGroup}
+                  currentUser={currentUser}
+                  isTreasurer={isTreasurer}
+                  allCharges={allCharges}
+                />
+              )}
+            </div>
+          );
 
-          <TabBar
-            tabs={isTreasurer ? treasurerTabs : memberTabs}
-            active={tab}
-            onChange={setTab}
-          />
-
-          <div
-            style={{
-              maxWidth: tab === "dashboard" ? "none" : 560,
-              margin: "0 auto",
-            }}
-          >
-            {tab === "dashboard" && (
-              <DashboardTab
-                group={group}
-                currentUser={currentUser}
-                allCharges={allCharges}
-                setGroup={setGroup}
-                setTab={setTab}
-              />
-            )}
-            {tab === "rent" && isTreasurer && (
-              <RentTab group={group} setGroup={setGroup} />
-            )}
-            {tab === "utilities" && isTreasurer && (
-              <UtilitiesTab group={group} setGroup={setGroup} />
-            )}
-            {tab === "expenses" && (
-              <ExpensesTab
-                group={group}
-                setGroup={setGroup}
-                currentUser={currentUser}
-                isTreasurer={isTreasurer}
-              />
-            )}
-            {tab === "subgroups" && (
-              <SubgroupsTab
-                group={group}
-                setGroup={setGroup}
-                currentUser={currentUser}
-              />
-            )}
-            {tab === "chores" && (
-              <ChoresTab
-                group={group}
-                setGroup={setGroup}
-                currentUser={currentUser}
-              />
-            )}
-            {tab === "settle" && (
-              <SettleTab
-                group={group}
-                setGroup={setGroup}
-                allCharges={allCharges}
-                currentUser={currentUser}
-              />
-            )}
-            {tab === "members" && (
-              <MembersTab
-                group={group}
-                setGroup={setGroup}
-                currentUser={currentUser}
-                isTreasurer={isTreasurer}
-                allCharges={allCharges}
-              />
-            )}
-          </div>
-
-          {IS_SANDBOX && (
+          const sandboxSwitcher = IS_SANDBOX && (
             <UserSwitcher
               group={group}
               currentUser={currentUser}
               setCurrentUser={setCurrentUser}
             />
-          )}
-        </div>
-      )}
+          );
+
+          // New left-sidebar layout (mobile: hamburger drawer).
+          if (SIDEBAR_NAV) {
+            return (
+              <div className="app-shell">
+                <SideNav
+                  tabs={navTabs}
+                  active={tab}
+                  onChange={setTab}
+                  isSandbox={IS_SANDBOX}
+                  groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+                  activeGroupId={activeGroupId}
+                  groupName={group.name}
+                  onSwitchGroup={switchGroup}
+                  onViewOtherGroups={handleViewOtherGroups}
+                />
+                <main
+                  className="app-main"
+                  style={{ padding: "12px 20px", paddingBottom: 80 }}
+                >
+                  {content}
+                  {sandboxSwitcher}
+                </main>
+              </div>
+            );
+          }
+
+          // Original top tab-bar layout (fallback).
+          return (
+            <div
+              style={{
+                maxWidth: 900,
+                margin: "0 auto",
+                padding: "12px 20px",
+                paddingBottom: 80,
+              }}
+            >
+              <div
+                style={{
+                  padding: "12px 0 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <h1
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        margin: 0,
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      divvyup
+                    </h1>
+                    {IS_SANDBOX && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          color: "#fff",
+                          background: T.red,
+                          borderRadius: 6,
+                          padding: "2px 6px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Sandbox
+                      </span>
+                    )}
+                  </div>
+                  <GroupSwitcher
+                    groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+                    activeGroupId={activeGroupId}
+                    groupName={group.name}
+                    onSwitchGroup={switchGroup}
+                  />
+                </div>
+                <button
+                  onClick={handleViewOtherGroups}
+                  style={{
+                    background: T.bg,
+                    border: "none",
+                    borderRadius: 20,
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    color: T.secondary,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    fontFamily: T.font,
+                  }}
+                >
+                  View other groups
+                </button>
+              </div>
+
+              <TabBar tabs={navTabs} active={tab} onChange={setTab} />
+
+              {content}
+              {sandboxSwitcher}
+            </div>
+          );
+        })()}
     </div>
   );
 }

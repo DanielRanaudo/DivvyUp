@@ -7,6 +7,7 @@ import {
   choreStatus,
   groupChores,
   myOpenChoreCount,
+  projectOccurrences,
 } from "./chores";
 import type { Chore } from "./types";
 
@@ -120,5 +121,63 @@ describe("choreStatus / groupChores / myOpenChoreCount", () => {
     const chores = [overdue, dueToday, upcoming];
     expect(myOpenChoreCount(chores, "a")).toBe(2);
     expect(myOpenChoreCount(chores, "b")).toBe(0); // b's chore is upcoming
+  });
+});
+
+describe("projectOccurrences", () => {
+  it("projects recurring occurrences within the window (inclusive)", () => {
+    const chore = baseChore({ nextDue: "2026-07-01", everyDays: 2 });
+    const occ = projectOccurrences([chore], "2026-07-01", "2026-07-07");
+    expect(occ.map((o) => o.date)).toEqual([
+      "2026-07-01",
+      "2026-07-03",
+      "2026-07-05",
+      "2026-07-07",
+    ]);
+    expect(occ.every((o) => o.assigneeId === "a")).toBe(true);
+  });
+
+  it("rotates the assignee on each projected occurrence", () => {
+    const chore = baseChore({
+      nextDue: "2026-07-01",
+      everyDays: 1,
+      assignMode: "rotation",
+      rotationIds: ["a", "b", "c"],
+      rotationIndex: 0,
+      assigneeId: "a",
+    });
+    const occ = projectOccurrences([chore], "2026-07-01", "2026-07-04");
+    expect(occ.map((o) => o.assigneeId)).toEqual(["a", "b", "c", "a"]);
+  });
+
+  it("excludes occurrences before the window and skips past overdue dates", () => {
+    const chore = baseChore({ nextDue: "2026-06-28", everyDays: 3 });
+    const occ = projectOccurrences([chore], "2026-07-01", "2026-07-05");
+    // 06-28, 07-01, 07-04, 07-07 -> only 07-01 and 07-04 land in range
+    expect(occ.map((o) => o.date)).toEqual(["2026-07-01", "2026-07-04"]);
+  });
+
+  it("yields at most one occurrence for one-off chores", () => {
+    const inRange = baseChore({ everyDays: 0, nextDue: "2026-07-03" });
+    const outOfRange = baseChore({ everyDays: 0, nextDue: "2026-08-01" });
+    expect(
+      projectOccurrences([inRange, outOfRange], "2026-07-01", "2026-07-31")
+    ).toEqual([
+      {
+        choreId: "chore-1",
+        name: "Trash",
+        icon: "🗑️",
+        date: "2026-07-03",
+        assigneeId: "a",
+        everyDays: 0,
+      },
+    ]);
+  });
+
+  it("sorts occurrences by date then name", () => {
+    const trash = baseChore({ id: "t", name: "Trash", nextDue: "2026-07-02", everyDays: 0 });
+    const dishes = baseChore({ id: "d", name: "Dishes", nextDue: "2026-07-02", everyDays: 0 });
+    const occ = projectOccurrences([trash, dishes], "2026-07-01", "2026-07-05");
+    expect(occ.map((o) => o.name)).toEqual(["Dishes", "Trash"]);
   });
 });

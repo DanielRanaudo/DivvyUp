@@ -179,6 +179,24 @@ export async function joinGroup(
   return data as string;
 }
 
+// Remove the current user's own membership row. RLS (members_delete) allows a
+// member to delete themselves, so no RPC is needed. A zero-row result means the
+// delete was blocked (e.g. stale membership), which we surface as an error.
+export async function leaveGroup(
+  supabase: SupabaseClient,
+  memberId: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("id", memberId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error("you don't have permission to leave this group");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Diff-based persistence: compares a previous and next Group and writes only
 // what changed. Called from the app's setGroup wrapper, so the individual tabs

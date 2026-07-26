@@ -8,6 +8,7 @@ interface WelcomeScreenProps {
   onLogout?: () => void;
   groups?: { id: string; name: string }[];
   onEnterGroup?: (id: string) => void;
+  onLeaveGroup?: (id: string) => void;
 }
 
 export default function WelcomeScreen({
@@ -16,6 +17,7 @@ export default function WelcomeScreen({
   onLogout,
   groups = [],
   onEnterGroup,
+  onLeaveGroup,
 }: WelcomeScreenProps) {
   const hasGroups = groups.length > 0 && !!onEnterGroup;
   return (
@@ -120,38 +122,69 @@ export default function WelcomeScreen({
             Your groups
           </div>
           {groups.map((g) => (
-            <button
+            <div
               key={g.id}
-              onClick={() => onEnterGroup!(g.id)}
               style={{
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                alignItems: "stretch",
                 width: "100%",
-                padding: "14px 18px",
                 borderRadius: T.radius,
-                border: "none",
                 background: T.cardSolid,
                 boxShadow: T.shadow,
-                color: T.text,
-                fontFamily: T.font,
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-                textAlign: "left",
+                overflow: "hidden",
               }}
             >
-              <span
+              <button
+                onClick={() => onEnterGroup!(g.id)}
                 style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "14px 18px",
+                  border: "none",
+                  background: "none",
+                  color: T.text,
+                  fontFamily: T.font,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textAlign: "left",
                 }}
               >
-                {g.name}
-              </span>
-              <span style={{ color: T.tertiary, fontSize: 18 }}>›</span>
-            </button>
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {g.name}
+                </span>
+                <span style={{ color: T.tertiary, fontSize: 18 }}>›</span>
+              </button>
+              {onLeaveGroup && (
+                <button
+                  onClick={() => onLeaveGroup(g.id)}
+                  aria-label={`Leave ${g.name}`}
+                  style={{
+                    flexShrink: 0,
+                    padding: "0 16px",
+                    border: "none",
+                    borderLeft: `1px solid ${T.border}`,
+                    background: "none",
+                    color: T.red,
+                    fontFamily: T.font,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Leave
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

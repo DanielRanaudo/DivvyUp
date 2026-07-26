@@ -2,8 +2,14 @@
 
 import { T, cardStyle } from "@/lib/tokens";
 import { calcSettlements } from "@/lib/settlements";
-import { groupChores, completeChore } from "@/lib/chores";
-import type { Group, Member, Charge, Chore } from "@/lib/types";
+import {
+  todayISO,
+  addDaysISO,
+  completeChore,
+  choreStatus,
+  projectOccurrences,
+} from "@/lib/chores";
+import type { Group, Member, Charge } from "@/lib/types";
 import Avatar from "@/components/Avatar";
 import NotificationBanner from "@/components/NotificationBanner";
 
@@ -55,7 +61,17 @@ export default function DashboardTab({
   const chores = group.chores ?? [];
   const memberById: Record<string, Member> = {};
   group.members.forEach((m) => (memberById[m.id] = m));
-  const groupedChores = groupChores(chores);
+  const memberIndex = (id: string) =>
+    group.members.findIndex((m) => m.id === id);
+
+  const today = todayISO();
+  const tomorrow = addDaysISO(today, 1);
+  // "Today" is the shared board: anything due today or still overdue.
+  const todayItems = chores
+    .filter((c) => c.nextDue <= today)
+    .sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+  // "Tomorrow" is a heads-up of what's coming next for the whole household.
+  const tomorrowItems = projectOccurrences(chores, tomorrow, tomorrow);
 
   const markChoreDone = (choreId: string) => {
     setGroup((prev) => ({
@@ -65,30 +81,6 @@ export default function DashboardTab({
       ),
     }));
   };
-
-  const formatChoreDate = (iso: string) => {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const choreSections: {
-    key: "overdue" | "today" | "upcoming";
-    label: string;
-    accent: string;
-    items: Chore[];
-  }[] = [
-    { key: "overdue", label: "Overdue", accent: T.red, items: groupedChores.overdue },
-    { key: "today", label: "Today", accent: T.blue, items: groupedChores.today },
-    {
-      key: "upcoming",
-      label: "Upcoming",
-      accent: T.secondary,
-      items: groupedChores.upcoming,
-    },
-  ];
 
   const choresColumn = (
     <div>
@@ -143,94 +135,208 @@ export default function DashboardTab({
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {choreSections.map(({ key, label, accent, items }) => {
-            if (items.length === 0) return null;
-            return (
-              <div key={key}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: accent,
-                    marginBottom: 6,
-                    paddingLeft: 2,
-                  }}
-                >
-                  {label}
-                </div>
-                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-                  {items.map((chore, i) => {
-                    const assignee = memberById[chore.assigneeId];
-                    const isMine = chore.assigneeId === currentUser.id;
-                    return (
-                      <div
-                        key={chore.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "10px 12px",
-                          borderLeft: `3px solid ${accent}`,
-                          borderBottom:
-                            i < items.length - 1
-                              ? `1px solid ${T.border}`
-                              : "none",
-                        }}
-                      >
-                        <div style={{ fontSize: 18 }}>{chore.icon}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontWeight: 500,
-                              fontSize: 14,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {chore.name}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: T.tertiary,
-                              marginTop: 1,
-                            }}
-                          >
-                            {assignee
-                              ? isMine
-                                ? "You"
-                                : assignee.name
-                              : "Unassigned"}{" "}
-                            · {formatChoreDate(chore.nextDue)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => markChoreDone(chore.id)}
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: T.blue,
+                marginBottom: 6,
+                paddingLeft: 2,
+              }}
+            >
+              Today
+            </div>
+            {todayItems.length === 0 ? (
+              <div
+                style={{
+                  ...cardStyle,
+                  textAlign: "center",
+                  color: T.tertiary,
+                  fontSize: 14,
+                  padding: 20,
+                }}
+              >
+                No chores left today 🎉
+              </div>
+            ) : (
+              <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                {todayItems.map((chore, i) => {
+                  const assignee = memberById[chore.assigneeId];
+                  const isMine = chore.assigneeId === currentUser.id;
+                  const overdue = choreStatus(chore) === "overdue";
+                  const accent = overdue ? T.red : T.blue;
+                  return (
+                    <div
+                      key={chore.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderLeft: `3px solid ${accent}`,
+                        borderBottom:
+                          i < todayItems.length - 1
+                            ? `1px solid ${T.border}`
+                            : "none",
+                      }}
+                    >
+                      <div style={{ fontSize: 18 }}>{chore.icon}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
                           style={{
-                            padding: "5px 10px",
-                            borderRadius: 16,
-                            border: "none",
-                            background: T.green,
-                            color: "#fff",
-                            fontFamily: T.font,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            flexShrink: 0,
+                            fontWeight: 500,
+                            fontSize: 14,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
-                          Done
-                        </button>
+                          {chore.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: T.tertiary,
+                            marginTop: 1,
+                          }}
+                        >
+                          {assignee
+                            ? isMine
+                              ? "You"
+                              : assignee.name
+                            : "Unassigned"}{" "}
+                          ·{" "}
+                          {overdue ? (
+                            <span style={{ color: T.red, fontWeight: 600 }}>
+                              Overdue
+                            </span>
+                          ) : (
+                            "Today"
+                          )}
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <button
+                        onClick={() => markChoreDone(chore.id)}
+                        disabled={!isMine}
+                        title={
+                          isMine
+                            ? undefined
+                            : "Only the assigned roommate can mark this done"
+                        }
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 16,
+                          border: "none",
+                          background: isMine ? T.green : T.bg,
+                          color: isMine ? "#fff" : T.tertiary,
+                          fontFamily: T.font,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: isMine ? "pointer" : "not-allowed",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            )}
+          </div>
+
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: T.secondary,
+                marginBottom: 6,
+                paddingLeft: 2,
+              }}
+            >
+              Tomorrow
+            </div>
+            {tomorrowItems.length === 0 ? (
+              <div
+                style={{
+                  ...cardStyle,
+                  textAlign: "center",
+                  color: T.tertiary,
+                  fontSize: 14,
+                  padding: 20,
+                }}
+              >
+                Nothing due tomorrow
+              </div>
+            ) : (
+              <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                {tomorrowItems.map((occ, i) => {
+                  const assignee = memberById[occ.assigneeId];
+                  const isMine = occ.assigneeId === currentUser.id;
+                  return (
+                    <div
+                      key={`${occ.choreId}-${i}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderLeft: `3px solid ${T.secondary}`,
+                        borderBottom:
+                          i < tomorrowItems.length - 1
+                            ? `1px solid ${T.border}`
+                            : "none",
+                      }}
+                    >
+                      <div style={{ fontSize: 18 }}>{occ.icon}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontWeight: 500,
+                            fontSize: 14,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {occ.name}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            fontSize: 12,
+                            color: T.tertiary,
+                            marginTop: 2,
+                          }}
+                        >
+                          {assignee && (
+                            <Avatar
+                              name={assignee.name}
+                              index={memberIndex(assignee.id)}
+                              size={16}
+                            />
+                          )}
+                          {assignee
+                            ? isMine
+                              ? "You"
+                              : assignee.name
+                            : "Unassigned"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
