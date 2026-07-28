@@ -1,10 +1,31 @@
 import type { Member, Charge, Payment, Settlement } from "./types";
 
-export function calcSmartSettlements(
+/** Balances under a cent either way count as square. */
+export const SETTLED_EPSILON = 0.01;
+
+/**
+ * The payments that move a balance: confirmed, and not swept up by a monthly
+ * close. An archived payment already did its work — the month it belonged to
+ * was settled up and whatever remained became that month's carry-forward, so
+ * counting it again would credit the payer twice.
+ */
+function countedPayments(payments: Payment[]): Payment[] {
+  return (payments || []).filter((p) => p.status === "confirmed" && !p.archived);
+}
+
+/**
+ * Net position of every member: positive means the group owes them, negative
+ * means they owe the group.
+ *
+ * Keys can include ids that are no longer members — a departed roommate still
+ * appears in the splits of expenses they were part of. Callers that only care
+ * about current members should look up by member id rather than iterating.
+ */
+export function calcBalances(
   members: Member[],
   charges: Charge[],
   payments: Payment[]
-): Settlement[] {
+): Record<string, number> {
   const bal: Record<string, number> = {};
   members.forEach((m) => (bal[m.id] = 0));
 
@@ -15,12 +36,20 @@ export function calcSmartSettlements(
     if (c.paidBy) bal[c.paidBy] = (bal[c.paidBy] || 0) + c.amount;
   });
 
-  (payments || [])
-    .filter((p) => p.status === "confirmed")
-    .forEach((p) => {
-      bal[p.fromId] = (bal[p.fromId] || 0) + p.amount;
-      bal[p.toId] = (bal[p.toId] || 0) - p.amount;
-    });
+  countedPayments(payments).forEach((p) => {
+    bal[p.fromId] = (bal[p.fromId] || 0) + p.amount;
+    bal[p.toId] = (bal[p.toId] || 0) - p.amount;
+  });
+
+  return bal;
+}
+
+export function calcSmartSettlements(
+  members: Member[],
+  charges: Charge[],
+  payments: Payment[]
+): Settlement[] {
+  const bal = calcBalances(members, charges, payments);
 
   const debtors: { id: string; name: string; amount: number }[] = [];
   const creditors: { id: string; name: string; amount: number }[] = [];
@@ -73,12 +102,10 @@ export function calcSimpleSettlements(
     });
   });
 
-  (payments || [])
-    .filter((p) => p.status === "confirmed")
-    .forEach((p) => {
-      const key = `${p.fromId}->${p.toId}`;
-      pairDebt[key] = (pairDebt[key] || 0) - p.amount;
-    });
+  countedPayments(payments).forEach((p) => {
+    const key = `${p.fromId}->${p.toId}`;
+    pairDebt[key] = (pairDebt[key] || 0) - p.amount;
+  });
 
   const netted: Record<string, number> = {};
   Object.entries(pairDebt).forEach(([key, amt]) => {

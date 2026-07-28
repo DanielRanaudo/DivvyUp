@@ -11,22 +11,35 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "build:e2e": "NEXT_PUBLIC_SANDBOX=true NEXT_DIST_DIR=.next-e2e next build",
+    "start:e2e": "NEXT_PUBLIC_SANDBOX=true NEXT_DIST_DIR=.next-e2e next start",
+    "db:push": "npx --yes supabase db push",
+    "db:reset": "npx --yes supabase db reset",
+    "db:diff": "npx --yes supabase db diff",
+    "db:test": "npx --yes supabase test db"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.68.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
-    "next": "16.2.1",
+    "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
+  "comment:overrides": "Pulls a patched postcss in ahead of the version Next pins. brace-expansion is deliberately left alone: v5 changes an API that eslint's minimatch still uses.",
+  "overrides": {
+    "postcss": "^8.5.18"
+  },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

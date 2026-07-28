@@ -1,0 +1,6 @@
+# Supabase CLI configuration. `project_id` is a local label only; link a real
+# project with `supabase link --project-ref <ref>`.
+project_id = "divvyup"
+
+[db]
+major_version = 15

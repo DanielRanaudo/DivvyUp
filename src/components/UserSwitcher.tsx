@@ -38,6 +38,7 @@ export default function UserSwitcher({
     >
       <span style={{ color: "rgba(255,255,255,0.5)" }}>Viewing as</span>
       <select
+        aria-label="Viewing as"
         value={currentUser.id}
         onChange={(e) =>
           setCurrentUser(group.members.find((m) => m.id === e.target.value)!)

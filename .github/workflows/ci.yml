@@ -8,6 +8,12 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    env:
+      # A production build refuses to run without a backend (see
+      # assertConfigured in src/lib/config.ts). These placeholders exercise the
+      # real code path without pointing at a live project.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
     steps:
       - uses: actions/checkout@v4
 
@@ -30,3 +36,46 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Applies every migration to a throwaway local Postgres, then runs the
+      # pgTAP suites that prove the RLS rules actually hold.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Database tests
+        run: supabase test db

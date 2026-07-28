@@ -24,6 +24,62 @@ select {
   background: rgba(0, 122, 255, 0.2);
 }
 
+/* Keyboard users need to see where they are. Inline styles can't express
+   :focus-visible, so the ring lives here for every interactive element. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+/* A checkbox/radio kept in the accessibility tree but drawn by a sibling span.
+   Off-screen rather than display:none so it still takes focus. */
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.visually-hidden-input:focus-visible + span {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+/* Content that only screen readers should reach. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Respect the OS setting; the app is full of slide and fade transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -37,86 +93,6 @@ select {
   }
 }
 
-/* ---- Sidebar navigation layout (toggle via SIDEBAR_NAV in config.ts) ---- */
-.app-shell {
-  min-height: 100vh;
-}
-
-.sidenav-topbar {
-  display: none;
-}
-
-.sidenav-overlay {
-  display: none;
-}
-
-/* Desktop: sidebar sits in-flow to the left of the content. The sidebar +
-   content are centered as a unit and the content area is capped so wide
-   monitors don't leave big empty gutters around the narrow columns. */
-@media (min-width: 820px) {
-  .app-shell {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-  }
-
-  .sidenav {
-    position: sticky;
-    top: 0;
-    align-self: flex-start;
-    width: 220px;
-    flex-shrink: 0;
-    height: 100vh;
-    overflow-y: auto;
-  }
-
-  .sidenav-close {
-    display: none;
-  }
-
-  .app-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 860px;
-  }
-}
-
-/* Mobile: sidebar becomes an off-canvas drawer opened by the hamburger */
-@media (max-width: 819px) {
-  .sidenav-topbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-  }
-
-  .sidenav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 264px;
-    max-width: 82vw;
-    z-index: 60;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    overflow-y: auto;
-  }
-
-  .sidenav.sidenav-open {
-    transform: translateX(0);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.2);
-  }
-
-  .sidenav-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 55;
-  }
-}
-
 .chores-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -127,5 +103,67 @@ select {
 @media (min-width: 820px) {
   .chores-grid {
     grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  }
+}
+
+/* ---- Mobile navigation drawer (phones only, below 700px) ----
+   Desktop keeps the horizontal tab bar untouched. */
+.nav-hamburger {
+  display: none;
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  max-width: 80vw;
+  /* Above the sandbox UserSwitcher and save-error toast (both z-index 100),
+     so an open drawer isn't overlapped by floating widgets. */
+  z-index: 120;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  /* visibility keeps the closed drawer out of the tab order */
+  visibility: hidden;
+  transition: transform 0.25s ease, visibility 0.25s ease;
+}
+
+.nav-drawer-open {
+  transform: translateX(0);
+  visibility: visible;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.nav-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 110;
+}
+
+@media (max-width: 699px) {
+  .nav-hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* !important: TabBar sets display:flex inline, which outranks a class */
+  .nav-desktop-tabs {
+    display: none !important;
+  }
+
+  .nav-view-groups {
+    display: none;
+  }
+}
+
+/* Safety net: if the viewport grows past mobile while the drawer is open,
+   don't leave a stray panel floating over the desktop layout. */
+@media (min-width: 700px) {
+  .nav-drawer,
+  .nav-drawer-overlay {
+    display: none;
   }
 }

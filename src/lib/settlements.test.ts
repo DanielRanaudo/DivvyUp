@@ -10,6 +10,7 @@ const member = (id: string, isTreasurer = false): Member => ({
   id,
   name: id.toUpperCase(),
   venmo: "",
+  zelle: "",
   isTreasurer,
 });
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { T } from "@/lib/tokens";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface GroupSwitcherProps {
   groups: { id: string; name: string }[];
@@ -17,12 +18,16 @@ export default function GroupSwitcher({
   onSwitchGroup,
 }: GroupSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const menuRef = useFocusTrap<HTMLDivElement>(open, close);
 
   return (
     <div style={{ position: "relative", marginTop: 1 }}>
       {groups.length > 1 ? (
         <button
           onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-haspopup="menu"
           style={{
             display: "flex",
             alignItems: "center",
@@ -54,7 +59,8 @@ export default function GroupSwitcher({
       {open && (
         <>
           <div
-            onClick={() => setOpen(false)}
+            aria-hidden="true"
+            onClick={close}
             style={{
               position: "fixed",
               inset: 0,
@@ -62,6 +68,9 @@ export default function GroupSwitcher({
             }}
           />
           <div
+            ref={menuRef}
+            role="menu"
+            aria-label="Your groups"
             style={{
               position: "absolute",
               top: "calc(100% + 6px)",
@@ -91,6 +100,8 @@ export default function GroupSwitcher({
               return (
                 <button
                   key={g.id}
+                  role="menuitem"
+                  aria-current={isActive ? "true" : undefined}
                   onClick={() => {
                     onSwitchGroup(g.id);
                     setOpen(false);
@@ -122,7 +133,11 @@ export default function GroupSwitcher({
                   >
                     {g.name}
                   </span>
-                  {isActive && <span style={{ fontSize: 12 }}>✓</span>}
+                  {isActive && (
+                    <span aria-hidden="true" style={{ fontSize: 12 }}>
+                      ✓
+                    </span>
+                  )}
                 </button>
               );
             })}

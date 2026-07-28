@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { T, cardStyle } from "@/lib/tokens";
+import { reportError } from "@/lib/observability";
 
 export default function Error({
   error,
@@ -11,7 +12,9 @@ export default function Error({
   unstable_retry: () => void;
 }) {
   useEffect(() => {
-    console.error("App error boundary caught:", error);
+    reportError("App error boundary caught an error", error, {
+      digest: error.digest,
+    });
   }, [error]);
 
   return (
@@ -28,7 +31,9 @@ export default function Error({
       }}
     >
       <div style={{ ...cardStyle, maxWidth: 400, textAlign: "center" }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>😵</div>
+        <div aria-hidden="true" style={{ fontSize: 40, marginBottom: 12 }}>
+          😵
+        </div>
         <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 8px" }}>
           Something went wrong
         </h2>

@@ -1,6 +1,8 @@
 "use client";
 
 import { T } from "@/lib/tokens";
+import { roster } from "@/lib/roster";
+import { formatDay } from "@/lib/format";
 import { todayISO, addDaysISO, projectOccurrences } from "@/lib/chores";
 import type { Chore, Member } from "@/lib/types";
 import Avatar from "@/components/Avatar";
@@ -28,14 +30,6 @@ const daysBetween = (a: string, b: string) => {
   );
 };
 
-const formatDate = (iso: string) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-};
-
 /**
  * A month-at-a-glance grid of every roommate's chores. Occurrences assigned to
  * the current user are highlighted in blue ("yours"); everyone else's are shown
@@ -51,9 +45,7 @@ export default function ChoreCalendar({
   const calendarStart = today;
   const calendarEnd = addDaysISO(today, days);
 
-  const memberIndex = (id: string) => members.findIndex((m) => m.id === id);
-  const memberById: Record<string, Member> = {};
-  members.forEach((m) => (memberById[m.id] = m));
+  const { byId: memberById, indexOf: memberIndex } = roster(members);
 
   const occurrences = projectOccurrences(chores, calendarStart, calendarEnd);
   const occByDate = occurrences.reduce<Record<string, typeof occurrences>>(
@@ -88,7 +80,7 @@ export default function ChoreCalendar({
             Everyone&apos;s chores
           </h3>
           <p style={{ fontSize: 12, color: T.secondary, margin: "2px 0 0" }}>
-            {formatDate(calendarStart)} – {formatDate(calendarEnd)}
+            {formatDay(calendarStart)} – {formatDay(calendarEnd)}
           </p>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -190,9 +182,9 @@ export default function ChoreCalendar({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 {dayItems.map((o, i) => {
                   const mine = o.assigneeId === currentUser.id;
-                  const assignee = memberById[o.assigneeId];
+                  const assignee = memberById(o.assigneeId);
                   const label = `${o.name} · ${
-                    mine ? "You" : assignee?.name ?? "Unassigned"
+                    mine ? "You" : (assignee?.name ?? "Unassigned")
                   }`;
                   return (
                     <span
@@ -218,6 +210,7 @@ export default function ChoreCalendar({
                           name={assignee.name}
                           index={memberIndex(assignee.id)}
                           size={13}
+                          src={assignee.avatarUrl}
                         />
                       )}
                       <span style={{ fontSize: 12, lineHeight: 1.1 }}>

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { T, cardStyle, secTitle } from "@/lib/tokens";
+import { payContactLine } from "@/lib/profile";
 import type { Group, Member, Charge } from "@/lib/types";
-import {
-  calcSimpleSettlements,
-  calcSmartSettlements,
-} from "@/lib/settlements";
+import { calcSimpleSettlements, calcSmartSettlements } from "@/lib/settlements";
+import { canRemoveMember, removeMember } from "@/lib/members";
 import Avatar from "@/components/Avatar";
+import Toggle from "@/components/Toggle";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface MembersTabProps {
   group: Group;
@@ -36,7 +37,10 @@ export default function MembersTab({
   ).length;
   const paymentsSaved = simpleCount - smartCount;
   const [copied, setCopied] = useState(false);
-  const [confirmKick, setConfirmKick] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+  const [pendingTransfer, setPendingTransfer] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   const copyCode = () => {
     navigator.clipboard?.writeText(group.code).then(() => {
@@ -45,22 +49,100 @@ export default function MembersTab({
     });
   };
 
-  const kickMember = (id: string) => {
+  const removalTarget = group.members.find((m) => m.id === pendingRemoval);
+  const transferTarget = group.members.find((m) => m.id === pendingTransfer);
+
+  // Previewing the removal shows the treasurer exactly what it will change
+  // before they commit — re-split rent, reassigned chores, and so on.
+  const removalPreview = useMemo(
+    () => (pendingRemoval ? removeMember(group, pendingRemoval).notes : []),
+    [group, pendingRemoval]
+  );
+
+  const startRemoval = (id: string) => {
+    const check = canRemoveMember(group, id, allCharges);
+    if (!check.ok) {
+      setBlocked(check.reason ?? "That person can't be removed right now.");
+      return;
+    }
+    setPendingRemoval(id);
+  };
+
+  const confirmRemoval = () => {
+    if (!pendingRemoval) return;
+    // Re-check at the moment of action: balances may have moved while the
+    // dialog sat open, and a realtime update may have changed the group.
+    const check = canRemoveMember(group, pendingRemoval, allCharges);
+    if (!check.ok) {
+      setPendingRemoval(null);
+      setBlocked(check.reason ?? "That person can't be removed right now.");
+      return;
+    }
+    const name = removalTarget?.name ?? "They";
+    const { notes } = removeMember(group, pendingRemoval);
+    setGroup((prev) => removeMember(prev, pendingRemoval).group);
+    setPendingRemoval(null);
+    setNotice(
+      notes.length > 0
+        ? `${name} was removed. ${notes.join(" ")}`
+        : `${name} was removed.`
+    );
+  };
+
+  const confirmTransfer = () => {
+    if (!pendingTransfer) return;
+    const name = transferTarget?.name ?? "They";
     setGroup((prev) => ({
       ...prev,
-      members: prev.members.filter((m) => m.id !== id),
-      expenses: prev.expenses.filter((e) => e.submittedBy !== id),
-      subgroups: (prev.subgroups ?? []).map((s) => ({
-        ...s,
-        memberIds: s.memberIds.filter((mid) => mid !== id),
+      members: prev.members.map((m) => ({
+        ...m,
+        isTreasurer: m.id === pendingTransfer,
       })),
     }));
-    setConfirmKick(null);
+    setPendingTransfer(null);
+    setNotice(`${name} is now the treasurer.`);
   };
 
   return (
     <div>
       <h2 style={secTitle}>Members</h2>
+
+      {(notice || blocked) && (
+        <div
+          role="status"
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: T.radiusSm,
+            fontSize: 14,
+            lineHeight: 1.5,
+            background: blocked
+              ? "rgba(255,59,48,0.08)"
+              : "rgba(52,199,89,0.1)",
+            color: blocked ? T.red : T.text,
+          }}
+        >
+          {blocked ?? notice}
+          <button
+            onClick={() => {
+              setNotice(null);
+              setBlocked(null);
+            }}
+            aria-label="Dismiss message"
+            style={{
+              float: "right",
+              background: "none",
+              border: "none",
+              color: "inherit",
+              fontSize: 16,
+              cursor: "pointer",
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div
         style={{
@@ -83,10 +165,11 @@ export default function MembersTab({
         <div
           style={{
             fontFamily: T.mono,
-            fontSize: 32,
+            fontSize: "clamp(20px, 7vw, 30px)",
             fontWeight: 700,
-            letterSpacing: "0.2em",
+            letterSpacing: "0.12em",
             color: T.text,
+            overflowWrap: "anywhere",
           }}
         >
           {group.code}
@@ -121,16 +204,10 @@ export default function MembersTab({
               gap: 12,
               padding: "14px 18px",
               borderBottom:
-                i < group.members.length - 1
-                  ? `1px solid ${T.border}`
-                  : "none",
-              background:
-                confirmKick === m.id
-                  ? "rgba(255,59,48,0.04)"
-                  : "transparent",
+                i < group.members.length - 1 ? `1px solid ${T.border}` : "none",
             }}
           >
-            <Avatar name={m.name} index={i} size={40} />
+            <Avatar name={m.name} index={i} size={40} src={m.avatarUrl} />
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 15 }}>
                 {m.name}
@@ -159,57 +236,17 @@ export default function MembersTab({
                   </span>
                 )}
               </div>
-              {m.venmo && (
+              {payContactLine(m) && (
                 <div style={{ fontSize: 13, color: T.tertiary }}>
-                  {m.venmo}
+                  {payContactLine(m)}
                 </div>
               )}
             </div>
-            {isTreasurer &&
-              !m.isTreasurer &&
-              m.id !== currentUser.id &&
-              (confirmKick === m.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    alignItems: "center",
-                  }}
-                >
-                  <button
-                    onClick={() => kickMember(m.id)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: T.red,
-                      color: "#fff",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Remove
-                  </button>
-                  <button
-                    onClick={() => setConfirmKick(null)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: T.bg,
-                      color: T.secondary,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+            {isTreasurer && !m.isTreasurer && m.id !== currentUser.id && (
+              <div style={{ display: "flex", gap: 6 }}>
                 <button
-                  onClick={() => setConfirmKick(m.id)}
+                  onClick={() => setPendingTransfer(m.id)}
+                  aria-label={`Make ${m.name} treasurer`}
                   style={{
                     background: "none",
                     border: `1px solid ${T.border}`,
@@ -219,14 +256,57 @@ export default function MembersTab({
                     fontWeight: 500,
                     color: T.tertiary,
                     cursor: "pointer",
+                    fontFamily: T.font,
+                  }}
+                >
+                  Make treasurer
+                </button>
+                <button
+                  onClick={() => startRemoval(m.id)}
+                  aria-label={`Remove ${m.name} from the group`}
+                  style={{
+                    background: "none",
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 8,
+                    padding: "5px 12px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: T.tertiary,
+                    cursor: "pointer",
+                    fontFamily: T.font,
                   }}
                 >
                   Remove
                 </button>
-              ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title={`Remove ${removalTarget?.name ?? "member"}?`}
+        message={`${
+          removalTarget?.name ?? "They"
+        } is settled up, so removing them won't change anyone else's balance. Approved expenses and payment history stay on record.`}
+        details={removalPreview}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={confirmRemoval}
+        onCancel={() => setPendingRemoval(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingTransfer !== null}
+        title={`Make ${transferTarget?.name ?? "member"} treasurer?`}
+        message={`${
+          transferTarget?.name ?? "They"
+        } will be able to set rent, add bills, and approve expenses. You'll lose those abilities.`}
+        confirmLabel="Hand over"
+        onConfirm={confirmTransfer}
+        onCancel={() => setPendingTransfer(null)}
+      />
 
       {isTreasurer && (
         <div style={{ marginTop: 32 }}>
@@ -280,49 +360,22 @@ export default function MembersTab({
                       fontWeight: 500,
                     }}
                   >
-                    Turning this on would cut settle-up from {simpleCount} payment
+                    Turning this on would cut settle-up from {simpleCount}{" "}
+                    payment
                     {simpleCount === 1 ? "" : "s"} to {smartCount} payment
                     {smartCount === 1 ? "" : "s"}
                   </div>
                 )}
               </div>
-              <button
-                onClick={() =>
-                  setGroup((prev) => ({
-                    ...prev,
-                    smartSettle: !prev.smartSettle,
-                  }))
-                }
-                style={{
-                  width: 52,
-                  height: 32,
-                  borderRadius: 16,
-                  border: "none",
-                  cursor: "pointer",
-                  background: group.smartSettle
-                    ? T.green
-                    : "rgba(0,0,0,0.1)",
-                  position: "relative",
-                  transition: "background 0.3s",
-                  flexShrink: 0,
-                  marginTop: 2,
-                }}
-              >
-                <div
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 13,
-                    background: "#fff",
-                    position: "absolute",
-                    top: 3,
-                    left: group.smartSettle ? 23 : 3,
-                    transition:
-                      "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                  }}
+              <div style={{ marginTop: 2 }}>
+                <Toggle
+                  checked={group.smartSettle}
+                  onChange={(next) =>
+                    setGroup((prev) => ({ ...prev, smartSettle: next }))
+                  }
+                  label="Smart Balance"
                 />
-              </button>
+              </div>
             </div>
           </div>
         </div>
