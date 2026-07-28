@@ -4,8 +4,12 @@ export const T = {
   cardSolid: "#ffffff",
   border: "rgba(0,0,0,0.06)",
   text: "#1d1d1f",
-  secondary: "#86868b",
-  tertiary: "#aeaeb2",
+  // Both greys are dark enough to clear 4.5:1 against the page background as
+  // well as a card. The old #86868b / #aeaeb2 pair looked right on a bright
+  // laptop and disappeared on a phone in daylight, which is where the app is
+  // actually used — and dates and totals are set in the quieter of the two.
+  secondary: "#5d5d63",
+  tertiary: "#6e6e73",
   blue: "#007AFF",
   green: "#34C759",
   red: "#FF3B30",
@@ -69,6 +73,16 @@ export const secTitle: React.CSSProperties = {
   color: T.text,
   margin: "0 0 16px 0",
   letterSpacing: "-0.02em",
+};
+
+/** The small caps heading above a list of rows. */
+export const overline: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: T.secondary,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  margin: "0 0 10px 0",
 };
 
 export const FONT_URL =

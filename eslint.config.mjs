@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output from the end-to-end suite's own sandbox build.
+    ".next-e2e/**",
   ]),
 ]);
 

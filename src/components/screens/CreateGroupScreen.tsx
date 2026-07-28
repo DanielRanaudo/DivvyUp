@@ -55,12 +55,13 @@ export default function CreateGroupScreen({
         You&apos;ll be the treasurer — managing rent, utilities, and approving
         expenses.
       </p>
-      <div
-        style={{ display: "flex", flexDirection: "column", gap: 20 }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
-          <label style={labelStyle}>Group Name</label>
+          <label style={labelStyle} htmlFor="create-group-group-name">
+            Group Name
+          </label>
           <input
+            id="create-group-group-name"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             placeholder='e.g. "4200 Walnut St"'
@@ -81,9 +82,7 @@ export default function CreateGroupScreen({
             cursor: canSubmit ? "pointer" : "default",
             marginTop: 8,
             transition: "background 0.2s",
-            boxShadow: canSubmit
-              ? "0 4px 16px rgba(0,122,255,0.3)"
-              : "none",
+            boxShadow: canSubmit ? "0 4px 16px rgba(0,122,255,0.3)" : "none",
           }}
         >
           Create Group

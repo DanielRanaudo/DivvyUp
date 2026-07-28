@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evenSplit } from "./splits";
+import { evenShare, evenSplit, splitByWeights } from "./splits";
 
 const sum = (splits: Record<string, number>) =>
   Math.round(Object.values(splits).reduce((a, b) => a + b, 0) * 100) / 100;
@@ -31,5 +31,39 @@ describe("evenSplit", () => {
 
   it("handles zero amount", () => {
     expect(evenSplit(0, ["a", "b"])).toEqual({ a: 0, b: 0 });
+  });
+});
+
+describe("evenShare", () => {
+  it("divides evenly", () => {
+    expect(evenShare(90, 3)).toBe(30);
+  });
+
+  it("is zero in an empty house, rather than infinite", () => {
+    expect(evenShare(90, 0)).toBe(0);
+  });
+});
+
+describe("splitByWeights", () => {
+  it("divides in proportion to the weights", () => {
+    expect(splitByWeights(100, { a: 75, b: 25 })).toEqual({ a: 75, b: 25 });
+  });
+
+  it("hands leftover cents to the largest remainders, to the penny", () => {
+    const splits = splitByWeights(100, { a: 1, b: 1, c: 1 });
+    const total = Object.values(splits).reduce((s, x) => s + x, 0);
+    expect(total).toBeCloseTo(100, 10);
+  });
+
+  it("falls back to an even split when nobody has any weight", () => {
+    expect(splitByWeights(10, { a: 0, b: 0 })).toEqual({ a: 5, b: 5 });
+  });
+
+  it("treats a negative weight as no weight at all", () => {
+    expect(splitByWeights(10, { a: -5, b: 10 })).toEqual({ a: 0, b: 10 });
+  });
+
+  it("has nothing to divide when there is nobody to divide it between", () => {
+    expect(splitByWeights(10, {})).toEqual({});
   });
 });

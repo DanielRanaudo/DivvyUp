@@ -1,6 +1,7 @@
 "use client";
 
 import { T, cardStyle } from "@/lib/tokens";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { Payment, Group } from "@/lib/types";
 import Avatar from "./Avatar";
 
@@ -33,32 +34,47 @@ export default function NotificationBanner({
               border: "1px solid rgba(255,149,0,0.15)",
             }}
           >
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12 }}
-            >
-              <Avatar name={n.fromName} index={fromIdx} size={40} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar
+                name={n.fromName}
+                index={fromIdx}
+                size={40}
+                src={fromMember?.avatarUrl}
+              />
               <div style={{ flex: 1 }}>
-                <div
-                  style={{ fontSize: 15, fontWeight: 600, color: T.text }}
-                >
+                <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>
                   {n.fromName} paid you
                 </div>
                 <div
                   style={{
-                    fontFamily: T.mono,
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: T.green,
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 8,
                     marginTop: 2,
                   }}
                 >
-                  ${n.amount.toFixed(2)}
+                  <span
+                    style={{
+                      fontFamily: T.mono,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: T.green,
+                    }}
+                  >
+                    {formatMoney(n.amount)}
+                  </span>
+                  <span style={{ fontSize: 13, color: T.tertiary }}>
+                    {formatDate(n.date)}
+                  </span>
                 </div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button
                 onClick={() => onAction(n.id, "confirmed")}
+                aria-label={`Confirm the ${formatMoney(n.amount)} from ${
+                  n.fromName
+                }`}
                 style={{
                   flex: 1,
                   padding: "10px 0",
@@ -76,6 +92,9 @@ export default function NotificationBanner({
               </button>
               <button
                 onClick={() => onAction(n.id, "rejected")}
+                aria-label={`Deny the ${formatMoney(n.amount)} from ${
+                  n.fromName
+                }`}
                 style={{
                   flex: 1,
                   padding: "10px 0",

@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { T, inputStyle, labelStyle, cardStyle, secTitle } from "@/lib/tokens";
 import { uid } from "@/lib/utils";
+import { evenShare } from "@/lib/splits";
+import { formatMoney } from "@/lib/format";
 import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
 import type { Group } from "@/lib/types";
 import Avatar from "@/components/Avatar";
+import Checkbox from "@/components/Checkbox";
 
 interface RentTabProps {
   group: Group;
@@ -92,15 +95,17 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
 
       <div style={cardStyle}>
         <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Total Monthly Rent</label>
+          <label style={labelStyle} htmlFor="rent-total-monthly-rent">
+            Total Monthly Rent
+          </label>
           <input
+            id="rent-total-monthly-rent"
             type="number"
             min={0}
             step="0.01"
             value={amount}
             onChange={(e) => {
-              if (isNonNegativeInput(e.target.value))
-                setAmount(e.target.value);
+              if (isNonNegativeInput(e.target.value)) setAmount(e.target.value);
             }}
             onKeyDown={blockNegativeKeys}
             placeholder="0.00"
@@ -116,8 +121,12 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Split Method</label>
+          <div style={labelStyle} id="rent-split-method">
+            Split Method
+          </div>
           <div
+            role="group"
+            aria-labelledby="rent-split-method"
             style={{
               display: "flex",
               gap: 4,
@@ -136,22 +145,20 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
               <button
                 key={val}
                 onClick={() => setSplitType(val)}
+                aria-pressed={splitType === val}
                 style={{
                   flex: 1,
                   padding: "9px 0",
                   borderRadius: 8,
                   border: "none",
-                  background:
-                    splitType === val ? T.cardSolid : "transparent",
+                  background: splitType === val ? T.cardSolid : "transparent",
                   color: splitType === val ? T.text : T.secondary,
                   fontFamily: T.font,
                   fontSize: 14,
                   fontWeight: 500,
                   cursor: "pointer",
                   boxShadow:
-                    splitType === val
-                      ? "0 1px 4px rgba(0,0,0,0.08)"
-                      : "none",
+                    splitType === val ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                   transition: "all 0.2s",
                 }}
               >
@@ -178,11 +185,9 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                 fontWeight: 700,
               }}
             >
-              ${(amt / group.members.length).toFixed(2)}
+              {formatMoney(evenShare(amt, group.members.length))}
             </div>
-            <div
-              style={{ fontSize: 13, color: T.secondary, marginTop: 4 }}
-            >
+            <div style={{ fontSize: 13, color: T.secondary, marginTop: 4 }}>
               per person · {group.members.length} roommates
             </div>
           </div>
@@ -206,7 +211,7 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                   gap: 10,
                 }}
               >
-                <Avatar name={m.name} index={i} size={28} />
+                <Avatar name={m.name} index={i} size={28} src={m.avatarUrl} />
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>
                   {m.name}
                 </span>
@@ -231,9 +236,7 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                     padding: "8px 10px",
                   }}
                 />
-                <span
-                  style={{ fontSize: 14, color: T.secondary, width: 16 }}
-                >
+                <span style={{ fontSize: 14, color: T.secondary, width: 16 }}>
                   %
                 </span>
                 {amt > 0 && (
@@ -258,16 +261,13 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
             <div
               style={{
                 fontSize: 13,
-                color:
-                  Math.abs(pctTotal - 100) < 0.01 ? T.green : T.red,
+                color: Math.abs(pctTotal - 100) < 0.01 ? T.green : T.red,
                 fontWeight: 500,
                 marginTop: 4,
               }}
             >
               Total: {pctTotal.toFixed(1)}%
-              {Math.abs(pctTotal - 100) >= 0.01
-                ? " — must equal 100%"
-                : " ✓"}
+              {Math.abs(pctTotal - 100) >= 0.01 ? " — must equal 100%" : " ✓"}
             </div>
           </div>
         )}
@@ -290,15 +290,11 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
                   gap: 10,
                 }}
               >
-                <Avatar name={m.name} index={i} size={28} />
+                <Avatar name={m.name} index={i} size={28} src={m.avatarUrl} />
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>
                   {m.name}
                 </span>
-                <span
-                  style={{ fontSize: 14, color: T.secondary }}
-                >
-                  $
-                </span>
+                <span style={{ fontSize: 14, color: T.secondary }}>$</span>
                 <input
                   type="number"
                   min={0}
@@ -341,44 +337,13 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
           </div>
         )}
 
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 500,
-            color: T.text,
-            margin: "16px 0",
-          }}
-        >
-          <div
-            onClick={() => setRecurring(!recurring)}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 7,
-              border: "none",
-              cursor: "pointer",
-              background: recurring ? T.blue : T.bg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background 0.2s",
-              flexShrink: 0,
-            }}
-          >
-            {recurring && (
-              <span
-                style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}
-              >
-                ✓
-              </span>
-            )}
-          </div>
-          Recurring monthly
-        </label>
+        <div style={{ margin: "16px 0" }}>
+          <Checkbox
+            checked={recurring}
+            onChange={setRecurring}
+            label="Recurring monthly"
+          />
+        </div>
 
         <button
           onClick={handleSave}
@@ -394,8 +359,7 @@ export default function RentTab({ group, setGroup }: RentTabProps) {
             fontWeight: 600,
             cursor: amt > 0 ? "pointer" : "default",
             transition: "background 0.3s",
-            boxShadow:
-              amt > 0 ? "0 4px 16px rgba(0,122,255,0.3)" : "none",
+            boxShadow: amt > 0 ? "0 4px 16px rgba(0,122,255,0.3)" : "none",
           }}
         >
           {saved ? "Saved ✓" : "Save Rent"}

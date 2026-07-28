@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { T, inputStyle, labelStyle, cardStyle, secTitle } from "@/lib/tokens";
 import { uid } from "@/lib/utils";
+import { evenShare } from "@/lib/splits";
+import { formatMoney } from "@/lib/format";
 import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
-import type { Group } from "@/lib/types";
+import { stillOpen } from "@/lib/periods";
+import type { Group, Utility } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { usePendingDelete } from "@/hooks/usePendingDelete";
 
 interface UtilitiesTabProps {
   group: Group;
@@ -12,6 +17,15 @@ interface UtilitiesTabProps {
 }
 
 export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
+  // One-off bills from a closed month are archived; recurring ones bill again.
+  const utilities = stillOpen(group.utilities);
+
+  const removal = usePendingDelete<Utility>((u) =>
+    setGroup((prev) => ({
+      ...prev,
+      utilities: prev.utilities.filter((x) => x.id !== u.id),
+    }))
+  );
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -90,8 +104,11 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
             }}
           >
             <div>
-              <label style={labelStyle}>Name</label>
+              <label style={labelStyle} htmlFor="bill-name">
+                Name
+              </label>
               <input
+                id="bill-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Electric"
@@ -99,8 +116,11 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
               />
             </div>
             <div>
-              <label style={labelStyle}>Amount</label>
+              <label style={labelStyle} htmlFor="bill-amount">
+                Amount
+              </label>
               <input
+                id="bill-amount"
                 type="number"
                 min={0}
                 step="0.01"
@@ -123,8 +143,8 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
                 marginBottom: 12,
               }}
             >
-              ${(parseFloat(amount) / group.members.length).toFixed(2)} per
-              person
+              {formatMoney(evenShare(parseFloat(amount), group.members.length))}{" "}
+              per person
             </div>
           )}
           <button
@@ -147,7 +167,7 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
         </div>
       )}
 
-      {group.utilities.length === 0 && !showForm && (
+      {utilities.length === 0 && !showForm && (
         <div
           style={{
             textAlign: "center",
@@ -160,9 +180,9 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
         </div>
       )}
 
-      {group.utilities.length > 0 && (
+      {utilities.length > 0 && (
         <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-          {group.utilities.map((u, i) => (
+          {utilities.map((u, i) => (
             <div
               key={u.id}
               style={{
@@ -171,9 +191,7 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
                 gap: 12,
                 padding: "14px 18px",
                 borderBottom:
-                  i < group.utilities.length - 1
-                    ? `1px solid ${T.border}`
-                    : "none",
+                  i < utilities.length - 1 ? `1px solid ${T.border}` : "none",
               }}
             >
               <div
@@ -187,6 +205,7 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
                   justifyContent: "center",
                   fontSize: 17,
                 }}
+                aria-hidden="true"
               >
                 ⚡
               </div>
@@ -207,7 +226,7 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: T.tertiary }}>
-                  ${(u.amount / group.members.length).toFixed(2)} per
+                  {formatMoney(evenShare(u.amount, group.members.length))} per
                   person
                 </div>
               </div>
@@ -221,14 +240,8 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
                 ${u.amount.toFixed(2)}
               </div>
               <button
-                onClick={() =>
-                  setGroup((prev) => ({
-                    ...prev,
-                    utilities: prev.utilities.filter(
-                      (x) => x.id !== u.id
-                    ),
-                  }))
-                }
+                aria-label={`Delete ${u.name}`}
+                onClick={() => removal.ask(u)}
                 style={{
                   background: "none",
                   border: "none",
@@ -244,6 +257,16 @@ export default function UtilitiesTab({ group, setGroup }: UtilitiesTabProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={removal.target !== null}
+        title={`Delete ${removal.target?.name ?? "bill"}?`}
+        message="Everyone's share of it comes off the balances, so what people owe each other will change."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={removal.confirm}
+        onCancel={removal.cancel}
+      />
     </div>
   );
 }

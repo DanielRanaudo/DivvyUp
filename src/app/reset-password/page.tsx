@@ -49,7 +49,9 @@ export default function ResetPasswordPage() {
             boxShadow: "0 8px 24px rgba(0,122,255,0.3)",
           }}
         >
-          <span style={{ fontSize: 26, color: "#fff", fontWeight: 700 }}>÷</span>
+          <span style={{ fontSize: 26, color: "#fff", fontWeight: 700 }}>
+            ÷
+          </span>
         </div>
         <h2
           style={{
@@ -139,8 +141,11 @@ export default function ResetPasswordPage() {
         Enter a new password for your account.
       </p>
       <div>
-        <label style={labelStyle}>New Password</label>
+        <label style={labelStyle} htmlFor="reset-new-password">
+          New Password
+        </label>
         <input
+          id="reset-new-password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -149,8 +154,11 @@ export default function ResetPasswordPage() {
         />
       </div>
       <div>
-        <label style={labelStyle}>Confirm Password</label>
+        <label style={labelStyle} htmlFor="reset-confirm-password">
+          Confirm Password
+        </label>
         <input
+          id="reset-confirm-password"
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}

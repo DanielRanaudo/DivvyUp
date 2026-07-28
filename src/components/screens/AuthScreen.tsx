@@ -17,9 +17,7 @@ export default function AuthScreen() {
 
   const isSignup = mode === "signup";
   const canSubmit =
-    email.trim() &&
-    password.length >= 6 &&
-    (!isSignup || name.trim());
+    email.trim() && password.length >= 6 && (!isSignup || name.trim());
 
   const submit = async () => {
     if (!canSubmit || busy) return;
@@ -75,7 +73,9 @@ export default function AuthScreen() {
             boxShadow: "0 8px 24px rgba(0,122,255,0.3)",
           }}
         >
-          <span style={{ fontSize: 26, color: "#fff", fontWeight: 700 }}>÷</span>
+          <span style={{ fontSize: 26, color: "#fff", fontWeight: 700 }}>
+            ÷
+          </span>
         </div>
         <h2
           style={{
@@ -99,8 +99,11 @@ export default function AuthScreen() {
         {isSignup && (
           <>
             <div>
-              <label style={labelStyle}>Your Name</label>
+              <label style={labelStyle} htmlFor="auth-your-name">
+                Your Name
+              </label>
               <input
+                id="auth-your-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Daniel"
@@ -108,8 +111,11 @@ export default function AuthScreen() {
               />
             </div>
             <div>
-              <label style={labelStyle}>Venmo / Zelle</label>
+              <label style={labelStyle} htmlFor="auth-venmo-zelle">
+                Venmo / Zelle
+              </label>
               <input
+                id="auth-venmo-zelle"
                 value={venmo}
                 onChange={(e) => setVenmo(e.target.value)}
                 placeholder="@danielv (optional)"
@@ -119,8 +125,11 @@ export default function AuthScreen() {
           </>
         )}
         <div>
-          <label style={labelStyle}>Email</label>
+          <label style={labelStyle} htmlFor="auth-email">
+            Email
+          </label>
           <input
+            id="auth-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -129,8 +138,11 @@ export default function AuthScreen() {
           />
         </div>
         <div>
-          <label style={labelStyle}>Password</label>
+          <label style={labelStyle} htmlFor="auth-password">
+            Password
+          </label>
           <input
+            id="auth-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

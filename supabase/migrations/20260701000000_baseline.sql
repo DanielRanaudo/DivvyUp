@@ -1,11 +1,11 @@
 -- ============================================================================
--- DivvyUp - Supabase schema, security (RLS) and RPCs
+-- DivvyUp baseline: tables, security (RLS) and RPCs
 -- ============================================================================
--- HOW TO USE:
---   1. Open your Supabase project -> SQL Editor -> New query
---   2. Paste this entire file and click "Run"
---   3. It is safe to re-run (idempotent): tables use IF NOT EXISTS, functions
---      use CREATE OR REPLACE, and policies/triggers are dropped first.
+-- This is the starting state of the database. Later migrations in this folder
+-- build on it; run them in filename order.
+--
+-- Every statement is idempotent, so re-running this file against a database
+-- that already has the baseline applied is safe.
 --
 -- SECURITY MODEL:
 --   - Every table has Row Level Security enabled.
@@ -23,8 +23,16 @@ create table if not exists public.profiles (
   email      text,
   name       text not null default '',
   venmo      text not null default '',
+  zelle      text not null default '',
+  avatar_url text,
   created_at timestamptz not null default now()
 );
+
+-- Migrations for databases created before these columns existed.
+alter table public.profiles
+  add column if not exists zelle text not null default '';
+alter table public.profiles
+  add column if not exists avatar_url text;
 
 create table if not exists public.groups (
   id           uuid primary key default gen_random_uuid(),
@@ -41,10 +49,18 @@ create table if not exists public.group_members (
   user_id      uuid not null references public.profiles(id) on delete cascade,
   name         text not null,
   venmo        text not null default '',
+  zelle        text not null default '',
+  avatar_url   text,
   is_treasurer boolean not null default false,
   created_at   timestamptz not null default now(),
   unique (group_id, user_id)
 );
+
+-- Migrations for databases created before these columns existed.
+alter table public.group_members
+  add column if not exists zelle text not null default '';
+alter table public.group_members
+  add column if not exists avatar_url text;
 
 create table if not exists public.rent (
   id          uuid primary key default gen_random_uuid(),
@@ -132,12 +148,13 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, name, venmo)
+  insert into public.profiles (id, email, name, venmo, zelle)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'name', ''),
-    coalesce(new.raw_user_meta_data->>'venmo', '')
+    coalesce(new.raw_user_meta_data->>'venmo', ''),
+    coalesce(new.raw_user_meta_data->>'zelle', '')
   )
   on conflict (id) do nothing;
   return new;
@@ -339,12 +356,15 @@ declare
   new_code   text;
   p_name     text;
   p_venmo    text;
+  p_zelle    text;
+  p_avatar   text;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
   end if;
 
-  select name, venmo into p_name, p_venmo
+  select name, venmo, zelle, avatar_url
+    into p_name, p_venmo, p_zelle, p_avatar
   from public.profiles
   where id = auth.uid();
 
@@ -357,8 +377,12 @@ begin
   values (p_group_name, new_code, auth.uid())
   returning id into g_id;
 
-  insert into public.group_members (group_id, user_id, name, venmo, is_treasurer)
-  values (g_id, auth.uid(), coalesce(p_name, ''), coalesce(p_venmo, ''), true);
+  insert into public.group_members
+    (group_id, user_id, name, venmo, zelle, avatar_url, is_treasurer)
+  values (
+    g_id, auth.uid(), coalesce(p_name, ''), coalesce(p_venmo, ''),
+    coalesce(p_zelle, ''), p_avatar, true
+  );
 
   return g_id;
 end;
@@ -375,7 +399,9 @@ security definer
 set search_path = public
 as $$
 declare
-  g_id uuid;
+  g_id     uuid;
+  p_zelle  text;
+  p_avatar text;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -400,8 +426,18 @@ begin
     raise exception 'Name already taken';
   end if;
 
-  insert into public.group_members (group_id, user_id, name, venmo, is_treasurer)
-  values (g_id, auth.uid(), trim(p_display_name), coalesce(p_venmo, ''), false);
+  -- Zelle and avatar aren't collected on the join form; inherit them from the
+  -- user's profile so a new membership matches their account.
+  select zelle, avatar_url into p_zelle, p_avatar
+  from public.profiles
+  where id = auth.uid();
+
+  insert into public.group_members
+    (group_id, user_id, name, venmo, zelle, avatar_url, is_treasurer)
+  values (
+    g_id, auth.uid(), trim(p_display_name), coalesce(p_venmo, ''),
+    coalesce(p_zelle, ''), p_avatar, false
+  );
 
   return g_id;
 end;
@@ -445,9 +481,7 @@ grant execute on function public.update_group_docs(uuid, jsonb, jsonb) to authen
 
 -- ---------------------------------------------------------------------------
 -- 8. Storage: receipt images
---    Objects are stored as {group_id}/{uuid}.{jpg|pdf}. The bucket is public for
---    reads (URLs are unguessable UUIDs); uploads/deletes require membership
---    in the group whose folder is being written to.
+--    Objects are stored as {group_id}/{uuid}.{jpg|pdf}.
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -456,7 +490,6 @@ values (
   array['image/png', 'image/jpeg', 'application/pdf']
 )
 on conflict (id) do update set
-  public = true,
   file_size_limit = 10485760,
   allowed_mime_types = array['image/png', 'image/jpeg', 'application/pdf'];
 
@@ -482,6 +515,53 @@ create policy receipts_delete on storage.objects
   using (
     bucket_id = 'receipts'
     and public.is_group_member(((storage.foldername(name))[1])::uuid)
+  );
+
+
+-- ---------------------------------------------------------------------------
+-- 8b. Storage: profile pictures
+--     Objects are stored as {user_id}/{uuid}.jpg. Reads are public (roommates
+--     need to see each other's avatars); a user may only write or delete
+--     inside their own folder.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars', 'avatars', true, 5242880,
+  array['image/png', 'image/jpeg']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = array['image/png', 'image/jpeg'];
+
+drop policy if exists avatars_select on storage.objects;
+create policy avatars_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'avatars');
+
+drop policy if exists avatars_insert on storage.objects;
+create policy avatars_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists avatars_update on storage.objects;
+create policy avatars_update on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists avatars_delete on storage.objects;
+create policy avatars_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
   );
 
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { T, inputStyle, labelStyle } from "@/lib/tokens";
+import { INVITE_CODE_LENGTH, normalizeInviteCode } from "@/lib/utils";
 import type { Group } from "@/lib/types";
 
 interface JoinGroupScreenProps {
@@ -26,29 +27,25 @@ export default function JoinGroupScreen({
   const [venmo, setVenmo] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const canSubmit = code.trim().length === 6 && name.trim() && !busy;
+  const canSubmit = code.length === INVITE_CODE_LENGTH && name.trim() && !busy;
 
   const handleJoin = async () => {
     if (onJoinCode) {
       setBusy(true);
       setError("");
-      const err = await onJoinCode(code.trim(), name.trim(), venmo.trim());
+      const err = await onJoinCode(code, name.trim(), venmo.trim());
       if (err) setError(err);
       setBusy(false);
       return;
     }
 
-    const g = groups.find(
-      (g) => g.code === code.trim().toUpperCase()
-    );
+    const g = groups.find((g) => g.code === code);
     if (!g) {
       setError("Group not found");
       return;
     }
     if (
-      g.members.find(
-        (m) => m.name.toLowerCase() === name.trim().toLowerCase()
-      )
+      g.members.find((m) => m.name.toLowerCase() === name.trim().toLowerCase())
     ) {
       setError("Name already taken");
       return;
@@ -94,32 +91,38 @@ export default function JoinGroupScreen({
       >
         Enter the invite code from your treasurer.
       </p>
-      <div
-        style={{ display: "flex", flexDirection: "column", gap: 20 }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
-          <label style={labelStyle}>Invite Code</label>
+          <label style={labelStyle} htmlFor="join-invite-code">
+            Invite Code
+          </label>
           <input
+            id="join-invite-code"
             value={code}
             onChange={(e) => {
-              setCode(e.target.value.toUpperCase());
+              setCode(normalizeInviteCode(e.target.value));
               setError("");
             }}
-            placeholder="ABC123"
-            maxLength={6}
+            placeholder="A1B2C3D4E5"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
             style={{
               ...inputStyle,
               fontFamily: T.mono,
-              letterSpacing: "0.2em",
-              fontSize: 22,
+              letterSpacing: "0.12em",
+              fontSize: 20,
               textAlign: "center",
               fontWeight: 600,
             }}
           />
         </div>
         <div>
-          <label style={labelStyle}>Your Name</label>
+          <label style={labelStyle} htmlFor="join-your-name">
+            Your Name
+          </label>
           <input
+            id="join-your-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
@@ -127,8 +130,11 @@ export default function JoinGroupScreen({
           />
         </div>
         <div>
-          <label style={labelStyle}>Venmo / Zelle</label>
+          <label style={labelStyle} htmlFor="join-venmo-zelle">
+            Venmo / Zelle
+          </label>
           <input
+            id="join-venmo-zelle"
             value={venmo}
             onChange={(e) => setVenmo(e.target.value)}
             placeholder="@yourhandle (optional)"
@@ -153,9 +159,7 @@ export default function JoinGroupScreen({
             fontWeight: 600,
             cursor: canSubmit ? "pointer" : "default",
             marginTop: 8,
-            boxShadow: canSubmit
-              ? "0 4px 16px rgba(0,122,255,0.3)"
-              : "none",
+            boxShadow: canSubmit ? "0 4px 16px rgba(0,122,255,0.3)" : "none",
           }}
         >
           Join Group
