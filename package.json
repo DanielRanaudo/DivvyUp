@@ -25,8 +25,8 @@
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "next": "16.2.12",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "comment:overrides": "Pulls a patched postcss in ahead of the version Next pins. brace-expansion is deliberately left alone: v5 changes an API that eslint's minimatch still uses.",
   "overrides": {
