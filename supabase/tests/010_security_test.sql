@@ -91,6 +91,12 @@ select lives_ok(
 
 
 -- --- 1b. Submissions start pending, with the splits left blank -------------
+--
+-- Where the expected error is a SQLSTATE rather than a message, the null third
+-- argument matters: pgTAP reads throws_ok(sql, code, text) as (sql, code,
+-- *expected message*), so passing the description there asserts that Postgres
+-- worded its refusal exactly like our test name. Null says "any message", and
+-- the description takes its proper fourth slot.
 
 select throws_ok(
   format(
@@ -100,6 +106,7 @@ select throws_ok(
     tests.recall('group'), tests.recall('bea_member')
   ),
   '42501',
+  null::text,
   'a member cannot insert an expense that is already approved'
 );
 
@@ -112,6 +119,7 @@ select throws_ok(
     json_build_object(tests.recall('alex_member'), 30)::text
   ),
   '42501',
+  null::text,
   'a member cannot dictate the splits when submitting'
 );
 
@@ -133,6 +141,7 @@ select throws_ok(
     tests.recall('group'), tests.recall('bea_member'), tests.recall('alex_member')
   ),
   '42501',
+  null::text,
   'a payer cannot record a payment as already confirmed'
 );
 
@@ -296,6 +305,7 @@ select throws_ok(
     tests.recall('group'), tests.recall('alex_member')
   ),
   '23514',
+  null::text,
   'an expense of zero is rejected by a check constraint'
 );
 
@@ -307,6 +317,7 @@ select throws_ok(
     tests.recall('group'), tests.recall('alex_member'), tests.recall('bea_member')
   ),
   '23514',
+  null::text,
   'a negative payment is rejected by a check constraint'
 );
 
@@ -317,6 +328,7 @@ select throws_ok(
     tests.recall('group')
   ),
   '23514',
+  null::text,
   'negative rent is rejected by a check constraint'
 );
 

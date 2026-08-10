@@ -68,6 +68,9 @@ select throws_ok(
     tests.recall('group')
   ),
   '40001',
+  -- Null, not the description: pgTAP would otherwise compare the description
+  -- against the message the RPC actually raises. See the note in 010.
+  null::text,
   'a write based on a stale version is refused with serialization_failure'
 );
 
