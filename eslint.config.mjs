@@ -14,6 +14,11 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Build output from the end-to-end suite's own sandbox build.
     ".next-e2e/**",
+    // Local Supabase CLI state, written by `supabase start`. Gitignored, so CI
+    // never sees it, but it ships a generated edge-runtime index.ts that fails
+    // lint on any machine that has run the database tests.
+    "supabase/.temp/**",
+    "supabase/.branches/**",
   ]),
 ]);
 
