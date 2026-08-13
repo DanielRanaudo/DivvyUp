@@ -2,6 +2,9 @@
 
 **Shared-expense management for houses too big for a group chat.**
 
+[**Live demo**](https://divvy-ughiy928m-danielranaudos-projects.vercel.app) ·
+[Run it locally](#run-it) · [Engineering notes](#engineering-highlights)
+
 [![CI](https://github.com/DanielRanaudo/DivvyUp/actions/workflows/ci.yml/badge.svg)](https://github.com/DanielRanaudo/DivvyUp/actions/workflows/ci.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-000000)
 ![React 19](https://img.shields.io/badge/React-19-149eca)
@@ -11,12 +14,44 @@
 
 Rent, utilities, groceries, and chores split across a ten-person house — with an
 approval trail, minimized settlement payments, a monthly close-out, and live sync
-between everyone's phones. Built for households too large for Splitwise-style
-apps: unequal rent, sub-groups, a treasurer, and ten people editing at once.
+between everyone's phones.
 
-```bash
-npm install && npm run sandbox   # full demo, nine fake roommates, no signup
-```
+![The dashboard: your balance, who you owe, chores due today](docs/screenshots/dashboard.png)
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/split.png" alt="Splitting an expense between only the people who shared it"></td>
+<td width="50%"><img src="docs/screenshots/settle.png" alt="Settle Up, showing who pays whom and their Venmo handles"></td>
+</tr>
+<tr>
+<td><em>Four split modes, live validation, penny-exact shares.</em></td>
+<td><em>Settlements reduced to the fewest possible transfers.</em></td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/mobile.png" width="320" alt="The mobile dashboard">
+  <br><em>Mobile-first, installable to a home screen — it gets used standing in a kitchen.</em>
+</p>
+
+---
+
+## Why I built this
+
+I'm moving into a house with **ten people**.
+
+Ten people means ten Venmo requests per bill, one person permanently fronting
+the utility company and chasing everyone else for it, and a group chat where
+"I'll get you back" goes to die. Splitting anything fairly gets genuinely hard
+at that size: rent isn't equal because the rooms aren't equal, only four of us
+share the second-floor bathroom supplies, and somebody has to decide whether the
+$243 Costco run gets split ten ways or eight.
+
+The part I care most about is the settlement math. Ten people owing each other
+in every direction is up to **45 separate payments**. DivvyUp nets everyone's
+position down to a single balance and matches debtors against creditors, so a
+month usually closes out in a handful of transfers instead of dozens — and
+nobody is stuck being the house bank.
 
 ---
 
@@ -125,7 +160,8 @@ npm run sandbox    # nine fake roommates, in-memory data, user switcher
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The header's user switcher
-lets you submit an expense as one roommate and approve it as the treasurer.
+lets you submit an expense as one roommate and approve it as the treasurer —
+the screenshots above are this mode.
 
 **With a real backend:**
 
@@ -145,91 +181,7 @@ lets you submit an expense as one roommate and approve it as the treasurer.
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run build` | Production build |
 
----
-
-## Troubleshooting & ops notes
-
-Things that actually came up running this, with the diagnosis that ended each
-one. Symptom → cause → fix.
-
-**`Could not find a relationship between 'groups' and 'group_periods' in the
-schema cache`** — groups fail to load right after pulling code that expects the
-period columns. The migrations exist locally but were never applied to the
-linked Supabase project, so the app and the remote schema are out of sync. Push
-them:
-
-```bash
-npx supabase login && npx supabase link --project-ref <ref>
-npx supabase db push --include-all
-```
-
-After pulling schema changes, push migrations before expecting the app to work
-against a remote database. The `db:*` scripts call `npx --yes supabase`, so no
-global CLI install is needed.
-
-**App stuck forever on a grey "Loading…"** — the page returns 200 but the UI
-never renders. A dropped or flaky network left `getSession()` and the initial
-group fetch pending indefinitely; both gated the shell with no timeout and
-logged nothing useful. Fixed with `withTimeout`
-([src/lib/utils.ts:69](src/lib/utils.ts#L69)): the group load times out at ~15s
-and surfaces a save-error banner, the auth session read times out at ~10s and
-falls through to login. Lesson: never gate the whole shell on an unbounded
-network promise.
-
-**`TypeError: fetch failed` / `getaddrinfo ENOTFOUND *.supabase.co`** — the dev
-console floods with failed requests to Supabase. This is a transient local
-DNS/network hop (the machine's hostname changing mid-session will do it), **not
-an application bug**. Recheck connectivity and restart `npm run dev` once the
-network settles; no code change applies.
-
-**Hydration overlay on `<body>` (`data-gr-ext-installed`,
-`data-new-gr-c-s-check-loaded`)** — the red "tree hydrated but attributes didn't
-match" overlay in dev. Grammarly and similar browser extensions inject
-attributes onto `<body>` before React hydrates. Fixed with
-`suppressHydrationWarning` on `<body>` in
-[src/app/layout.tsx:62](src/app/layout.tsx#L62) — body-only, so genuine child
-mismatches still report. Worth knowing before chasing a phantom SSR bug.
-
-**Undo → Split forgot the previous custom split** — after approving a custom
-split, hitting Undo and reopening Split started over from an even split.
-`reopenExpense` deliberately clears `splits`/`splitMode` so a pending expense
-stops moving balances, and `draftFromExpense` existed to recover the prior
-answer but was never wired into the UI, so it was discarded before the dialog
-opened. Fixed by capturing the draft at Undo time and passing it as
-`initialDraft` to `SplitExpenseDialog`
-([ExpensesTab.tsx:155](src/components/tabs/ExpensesTab.tsx#L155)); the
-remembered draft is cleared if the amount is edited while pending. Covered by an
-e2e smoke test.
-
-Flexible splits live under **Expenses → Split**, available to the treasurer on
-pending expenses: *Evenly*, *Some of us*, *Amounts*, *Percent*.
-
-### Hardening
-
-Holes found in a production-readiness audit and closed since:
-
-- **Realtime refetch could clobber in-flight optimistic edits** → pending writes
-  are tracked and realtime refetches deferred while any are outstanding.
-- **Rapid edits could apply out of order** → `persistGroupDiff` is serialized per
-  group.
-- **Concurrent multi-tab or multi-roommate edits overwrote silently** →
-  `docs_version` counter, stale `update_group_docs` calls rejected, and a
-  reload-on-conflict path in the UI.
-- **Member removal left stale rent, utility, chore, and sub-group state** →
-  tested `removeMember()` cleanup, and removal is blocked while the balance is
-  non-zero.
-- **RLS and money-integrity holes** — non-treasurers could escalate, clients
-  could insert already-approved expenses and payments, update policies were too
-  broad, receipts were public, invite codes were short → column-guard triggers,
-  force-pending inserts, `SECURITY DEFINER` approve/deny/confirm RPCs, amount
-  `CHECK`s, private receipts behind signed URLs, longer invite codes.
-- **Missing production env validation** → a production build throws if the
-  Supabase env vars are absent; sandbox shows a demo-mode banner.
-
-**For maintainers:** shipping a11y changes broke Playwright selectors — tab
-buttons gained an "— needs attention" suffix, so exact accessible-name matches
-failed, and visually-hidden checkboxes need keyboard `Space` rather than
-`.uncheck()`. Prefer count and role assertions over matching money text.
+The database tests need Docker running (`npx supabase start` first).
 
 ---
 
@@ -251,9 +203,13 @@ supabase/
 
 ---
 
-## Deployment
+## More
 
-Deployed on [Vercel](https://vercel.com): import the repo, set
+- **[Troubleshooting & ops notes](docs/TROUBLESHOOTING.md)** — symptom → cause →
+  fix for the problems that actually came up, plus the production-readiness
+  audit and what it closed.
+
+**Deployment.** [Vercel](https://vercel.com): import the repo, set
 `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and add the
 production domain to Supabase's auth URL configuration. `vercel.json` schedules
 the daily reminder job; auth emails go through [Resend](https://resend.com) SMTP.
