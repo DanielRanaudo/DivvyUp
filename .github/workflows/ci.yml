@@ -17,9 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24 ships npm 11, which is what writes package-lock.json locally.
+      # npm 10 reads that lockfile as incomplete — it wants @emnapi/* entries
+      # that npm 11 resolves differently — and `npm ci` refuses to install.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -42,9 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Kept in step with the checks job above; see the note there.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies

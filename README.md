@@ -9,9 +9,10 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
-Rent, utilities, groceries, and the guy who always covers the Costco run — split
-across ten roommates, with an approval trail, one-tap settlements, a monthly
-close-out, and live sync between everyone's phones.
+Rent, utilities, groceries, and chores split across a ten-person house — with an
+approval trail, minimized settlement payments, a monthly close-out, and live sync
+between everyone's phones. Built for households too large for Splitwise-style
+apps: unequal rent, sub-groups, a treasurer, and ten people editing at once.
 
 ```bash
 npm install && npm run sandbox   # full demo, nine fake roommates, no signup
@@ -19,183 +20,84 @@ npm install && npm run sandbox   # full demo, nine fake roommates, no signup
 
 ---
 
-## Why I built it
-
-I'm moving into a house with **ten people**. Ten people means ten Venmo
-requests per bill, one person fronting the utility company every month and
-chasing everyone else for it, and a group chat where "I'll get you back" goes to
-die. Splitwise-style apps assume a couple of roommates and one kind of expense;
-they don't handle a treasurer, a rent split that isn't equal because the rooms
-aren't equal, bills that only the second floor shares, or a chore rotation.
-
-DivvyUp is what I actually wanted for that house: one place where the house's
-money lives, where nobody is stuck being the bank, and where at the end of the
-month the whole thing zeroes out in as few payments as mathematically possible.
-
-Scale is the design constraint everywhere. Ten people settling naively is up to
-45 separate payments; the settlement engine gets a typical month down to a
-handful. Ten people editing at once is a race condition, so writes are versioned
-and rejected server-side rather than silently overwriting each other.
-
----
-
 ## Features
 
-### Money
+**Money** — rent (equal, percentage, or custom per person, recurring monthly) ·
+one-off and recurring bills · roommate-fronted expenses with receipt photos and
+treasurer approval · four split modes (even, subset, exact, percentage), all
+penny-exact so balances net to zero · sub-groups ("floors") with their own
+members and bills · settlement engine that minimizes the *number* of transfers,
+not just the totals · two-sided payment confirmation · monthly close-out with a
+compressed carry-forward ledger and browsable archive · CSV export · Venmo/Zelle
+handles surfaced next to what you owe.
 
-- **Rent** — equal, percentage, or custom per-person amounts (the corner
-  bedroom pays more), recurring automatically each month.
-- **Utilities & recurring bills** — one-off or monthly, split any way, with the
-  person who fronted it credited.
-- **Shared expenses** — anyone can front money and submit it with a receipt
-  photo; it becomes a real debt only once the treasurer approves it.
-- **Four split modes per expense** — evenly across the house, evenly across only
-  the people who shared it, exact dollar amounts, or percentages. Every mode is
-  **penny-exact**: leftover cents are distributed deterministically so balances
-  always net to exactly zero, with no drift.
-- **Sub-groups ("floors")** — a subset of the house with its own members and
-  its own bills, for the four people who share a bathroom or a Netflix login.
-- **Smart settlements** — a greedy debtor/creditor matching algorithm that
-  minimizes the *number of transfers* needed to square the house, not just the
-  totals. Toggleable back to simple pairwise "who owes whom" if the house
-  prefers that.
-- **Payment confirmation loop** — you mark a payment sent, the recipient
-  confirms it was received. Nothing moves a balance on one person's say-so.
-- **Monthly close-out** — the treasurer closes a month: one-off expenses,
-  payments, and bills are archived, whatever is still owed is compressed into a
-  short carry-forward ledger, and rent and recurring bills re-charge for the new
-  month. Keeps the app fast in month 24 instead of dragging two years of
-  receipts down the wire on every load.
-- **Past-months archive** — closed months are browsable a page at a time, with
-  their totals preserved.
-- **CSV export** — any month, open or archived, downloads as a spreadsheet of
-  expenses and payments.
-- **Payment handles** — Venmo and Zelle stored per person and surfaced right
-  next to the amount you owe them.
+**Household** — chores with fixed or round-robin assignment, repeat intervals,
+and a projected calendar · dashboard of your balance, what's due, and what's
+waiting on you · multi-group membership by invite code · treasurer role that can
+be handed off · member removal that blocks on open balances and re-splits rent ·
+daily digest emails · profiles mirrored across every group you're in.
 
-### Household
-
-- **Chores** — fixed assignee or round-robin rotation, custom repeat interval,
-  emoji icons, completion history, and a projected calendar of who has what for
-  the next several weeks.
-- **Dashboard** — your net balance, what you owe and who owes you, recent
-  charges, chores due, and payments waiting on your confirmation.
-- **Groups** — create a house, share an invite code, join by code, belong to
-  several houses at once and switch between them.
-- **Treasurer role** — controls rent, bills, and expense approvals, and can hand
-  the role to someone else.
-- **Safe member removal** — you can't remove a roommate who still has an open
-  balance; when they do leave, rent is re-split among the people actually living
-  there and the treasurer is told exactly what changed. Past charges keep their
-  original splits as an accurate record.
-- **Daily reminder emails** — a cron job emails each person one digest of the
-  expenses awaiting their approval and payments awaiting their confirmation,
-  with a 24-hour grace period so nobody gets nagged the same evening.
-- **Profiles** — avatar, Venmo, Zelle, email change; contact details are mirrored
-  into every group you're in, so editing them once updates all of them.
-
-### Product polish
-
-- **Installable PWA** — mobile-first, standalone display, home-screen icons.
-  It's used standing in a kitchen, not at a desk.
-- **Realtime sync** — a roommate's edit shows up on your screen without a
-  refresh.
-- **Optimistic UI** — every action lands instantly and rolls back with a toast
-  if the server rejects it.
-- **Offline-free demo mode** — the entire app runs with no backend and no
-  signup, with a user switcher for viewing the house as any roommate.
-- **Accessibility** — focus traps in every modal, keyboard-navigable dialogs,
-  `:focus-visible` rings, ARIA labels and live regions, and
-  `prefers-reduced-motion` support.
-- **Deep-linkable URLs** — the current screen, tab, and group live in the query
-  string, so the back button works and links are shareable.
+**Product** — installable mobile-first PWA · realtime sync · optimistic UI with
+rollback · backend-free demo mode with a user switcher · accessibility (focus
+traps, ARIA live regions, `prefers-reduced-motion`) · deep-linkable URLs.
 
 ---
 
 ## Engineering highlights
 
-The parts I'd want to talk through in an interview.
+### Authorization lives in Postgres, not the client
 
-### Authorization lives in Postgres, not in the client
+The browser talks to Supabase directly, so every authorization decision is
+enforced by row-level security and `SECURITY DEFINER` RPCs:
 
-The browser talks to Supabase directly, so **any client-side check is a
-suggestion, not a rule**. Every authorization decision is enforced by Postgres
-row-level security and `SECURITY DEFINER` RPCs:
+- Members read only their own groups; rent and bills are treasurer-only writes;
+  payments are confirmable only by the recipient.
+- Sensitive transitions are RPCs, validated server-side — `approve_expense`
+  re-derives splits and checks they sum to the amount within a cent,
+  `confirm_payment` refuses amount changes mid-confirmation, `transfer_treasurer`
+  is the only path to the role.
+- A column-guard trigger blocks members from editing protected fields on their
+  own membership row, `is_treasurer` above all.
+- Invite codes are 10 CSPRNG characters over an unambiguous 32-symbol alphabet,
+  with failed lookups rate-limited per user and wrong codes returning null.
 
-- Members can only read groups they belong to; rent and bills are treasurer-only
-  writes; expenses require treasurer approval; payments are confirmable only by
-  the person who received the money.
-- Sensitive state transitions are RPCs rather than table updates, so the
-  transition itself is validated server-side — `approve_expense` re-derives the
-  splits and checks they sum to the amount within a cent, `confirm_payment`
-  refuses to let the amount change while it's being confirmed, and
-  `transfer_treasurer` is the only path to the role.
-- A column-guard trigger stops a member from editing fields on their own
-  membership row that they aren't allowed to touch, `is_treasurer` above all.
-- Invite codes are 10 characters drawn from a CSPRNG over an unambiguous
-  32-symbol alphabet (no bias, no `0`/`O` confusion), and guessing is
-  rate-limited: failed lookups are recorded per user and throttled after ten in
-  an hour, with a wrong code returning null rather than confirming whether it
-  exists.
-
-The security-hardening migration exists because the baseline schema had real,
-exploitable holes — self-promotion to treasurer, inserting a pre-approved
-expense, choosing your own splits, editing a payment's amount while confirming
-it. Each one is now closed **and has a test that proves it stays closed**.
+A hardening migration closed real holes in the baseline schema — self-promotion
+to treasurer, inserting a pre-approved expense, choosing your own splits. Each
+one now has a test proving it stays closed.
 
 ### Tests that assert the attacks fail
 
-Three layers, because the risk lives in three different places.
-
-| Layer | Tool | What it covers |
+| Layer | Tool | Covers |
 |---|---|---|
-| **209 unit tests** across 16 files | Vitest | The money logic — splits, settlement algorithms, chore rotations, monthly close-out, member removal, CSV escaping — plus the persistence diff, tested against a fake Supabase client that records the calls it receives |
-| **11 browser tests** | Playwright | The path a household actually walks: front an expense, approve it, settle the debt, confirm the payment, close the month. Runs against a sandbox build, so there's no project to provision and nothing to clean up |
-| **59 database assertions** | pgTAP | Authorization, from an ordinary member's session: you cannot promote yourself, insert an approved expense, choose your own splits, edit an amount mid-confirmation, or clobber a roommate's simultaneous edit |
+| **209 unit tests** (16 files) | Vitest | Money logic — splits, settlements, chore rotation, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
+| **11 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
+| **59 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
 
-All three run in **GitHub Actions on every push and PR**, alongside lint,
-typecheck, and a production build — the database job spins up a throwaway
-Postgres, applies every migration, and runs the pgTAP suites against it.
+All three run in GitHub Actions on every push and PR, alongside lint, typecheck,
+and a production build.
 
-### Concurrency, for a house of ten
+### Concurrency for a house of ten
 
-Chores and sub-groups are stored as JSON documents, which meant two roommates
-editing different chores at once silently discarded one of them. They now carry
-a **version counter**: the client sends the version it read, and Postgres refuses
-the write if the document has moved on. The client refetches and says so instead
-of losing the edit without a word.
-
-Realtime has the mirror-image problem — a roommate's change arriving mid-save
-would clobber the write in flight — so incoming refetches are **deferred while a
-local write is pending**, and a burst of events from one action is debounced into
-a single refetch.
+Chores and sub-groups are JSON documents carrying a **version counter** — the
+client sends the version it read and Postgres rejects the write if the document
+moved on, so simultaneous edits surface a refetch instead of silently losing one.
+Realtime has the mirror problem, so incoming refetches are deferred while a local
+write is pending and event bursts are debounced into one.
 
 ### State and persistence
 
-Group state is held in React and written through to Supabase as a **diff**
-(`persistGroupDiff` in [src/lib/api.ts](src/lib/api.ts)): the store compares the
-next group against the last known server state, emits the minimal set of
-operations, and rolls the UI back to server state if any of them fail. Writes are
-serialized so two in-flight saves can't interleave.
+Group state lives in React and is written through to Supabase as a **diff**
+(`persistGroupDiff` in [src/lib/api.ts](src/lib/api.ts)): compare next state
+against last known server state, emit the minimal set of operations, roll the UI
+back if any fail. Writes are serialized so two saves can't interleave.
 
-### Security engineering beyond auth
+### Security beyond auth
 
-- **Strict Content Security Policy**, plus HSTS, `X-Frame-Options: DENY`,
-  `nosniff`, a locked-down `Permissions-Policy`, and referrer policy — with the
-  Supabase origin (and its WebSocket scheme) allowlisted explicitly.
-- **Private receipt storage.** Receipts are compressed client-side, uploaded to a
-  private bucket keyed by group, and served through short-lived signed URLs.
-  Storing a public URL would be storing a credential that never expires.
-- **CSV injection defense.** A roommate who names an expense `=cmd|...` would
-  otherwise be writing a formula into everyone's download; exported fields
-  starting with `=`, `+`, `-`, or `@` are quoted.
-- **Timing-safe cron auth.** The reminder endpoint compares its bearer token
-  without leaking, through timing, how much of the secret matched.
-- **Fail-closed configuration.** A production build with missing Supabase env
-  vars *throws at build time* rather than silently shipping an in-memory demo
-  that accepts a month of rent and stores none of it.
-- **Privacy-conscious error tracking.** Sentry reports carry the user id only —
-  never emails, never payment handles.
+Strict CSP plus HSTS, `X-Frame-Options: DENY`, `nosniff`, and a locked-down
+`Permissions-Policy` · receipts in a private bucket served through short-lived
+signed URLs · CSV formula-injection defense · timing-safe cron token comparison ·
+fail-closed config (a production build with missing env vars throws rather than
+shipping an in-memory demo) · Sentry reports carrying user id only.
 
 ---
 
@@ -203,66 +105,131 @@ serialized so two in-flight saves can't interleave.
 
 | | |
 |---|---|
-| **Framework** | Next.js 16 (App Router, Turbopack, Proxy/middleware for session refresh) |
-| **UI** | React 19, TypeScript (strict), Tailwind v4, a hand-rolled design-token system |
-| **Backend** | Supabase — Postgres, row-level security, `SECURITY DEFINER` RPCs, Realtime, Storage, Auth |
-| **Auth** | Supabase Auth: email/password, email confirmation, password reset, email change, cookie-based SSR sessions |
+| **Framework** | Next.js 16 (App Router, Turbopack, Proxy middleware for session refresh) |
+| **UI** | React 19, TypeScript (strict), Tailwind v4, hand-rolled design tokens |
+| **Backend** | Supabase — Postgres, RLS, `SECURITY DEFINER` RPCs, Realtime, Storage, Auth |
 | **Testing** | Vitest, Playwright, pgTAP |
-| **Ops** | GitHub Actions CI, Vercel (+ Vercel Cron), Sentry, Resend SMTP, Dependabot |
+| **Ops** | GitHub Actions CI, Vercel (+ Cron), Sentry, Resend SMTP, Dependabot |
 
-~17k lines of TypeScript and ~2.5k lines of SQL, all written by hand across six
-migrations.
+~17k lines of TypeScript and ~2.5k lines of SQL, hand-written across six migrations.
 
 ---
 
-## Try it locally
+## Run it
 
-**No backend, no signup — the fastest way to see it:**
+**Demo mode — no backend, no signup:**
 
 ```bash
 npm install
-npm run sandbox    # demo mode: nine fake roommates, in-memory data, user switcher
+npm run sandbox    # nine fake roommates, in-memory data, user switcher
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The user switcher in the
-header lets you act as any roommate, so you can submit an expense as one person
-and approve it as the treasurer.
+Open [http://localhost:3000](http://localhost:3000). The header's user switcher
+lets you submit an expense as one roommate and approve it as the treasurer.
 
 **With a real backend:**
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations — tables, RLS policies, RPCs, the `receipts` and
-   `avatars` storage buckets, and the realtime publication:
-
-   ```bash
-   npx supabase link --project-ref <your-project-ref>
-   npm run db:push
-   ```
-
-3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key
-   (**Project Settings → API**).
-4. In **Authentication → URL Configuration**, set your site URL and add
-   `/reset-password` as a redirect URL so password-reset emails work.
-5. `npm run dev` — the app now requires sign-in and persists to Supabase.
-
----
-
-## Scripts
+2. `npx supabase link --project-ref <ref>` then `npm run db:push` to apply
+   migrations (tables, RLS, RPCs, storage buckets, realtime publication).
+3. Copy `.env.example` to `.env.local` and fill in the project URL and anon key.
+4. In **Authentication → URL Configuration**, set the site URL and add
+   `/reset-password` as a redirect URL.
+5. `npm run dev`.
 
 | Script | Purpose |
 |--------|---------|
-| `npm run dev` | Dev server (backend mode if env vars are set) |
-| `npm run sandbox` | Dev server in demo mode (fake data, no backend) |
-| `npm run build` | Production build |
-| `npm test` | Unit tests (Vitest) |
-| `npm run test:e2e` | Browser smoke tests (Playwright) |
-| `npm run db:test` | Database authorization tests (pgTAP; needs Docker) |
-| `npm run db:push` | Apply pending migrations to the linked project |
-| `npm run db:reset` | Rebuild the local database from scratch |
+| `npm run dev` / `npm run sandbox` | Dev server (backend / demo mode) |
+| `npm test` / `npm run test:e2e` / `npm run db:test` | Vitest / Playwright / pgTAP |
+| `npm run db:push` / `npm run db:reset` | Apply migrations / rebuild local DB |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
+| `npm run build` | Production build |
 
-Playwright builds and serves the app itself on port 3100; install the browser
-once with `npx playwright install chromium`.
+---
+
+## Troubleshooting & ops notes
+
+Things that actually came up running this, with the diagnosis that ended each
+one. Symptom → cause → fix.
+
+**`Could not find a relationship between 'groups' and 'group_periods' in the
+schema cache`** — groups fail to load right after pulling code that expects the
+period columns. The migrations exist locally but were never applied to the
+linked Supabase project, so the app and the remote schema are out of sync. Push
+them:
+
+```bash
+npx supabase login && npx supabase link --project-ref <ref>
+npx supabase db push --include-all
+```
+
+After pulling schema changes, push migrations before expecting the app to work
+against a remote database. The `db:*` scripts call `npx --yes supabase`, so no
+global CLI install is needed.
+
+**App stuck forever on a grey "Loading…"** — the page returns 200 but the UI
+never renders. A dropped or flaky network left `getSession()` and the initial
+group fetch pending indefinitely; both gated the shell with no timeout and
+logged nothing useful. Fixed with `withTimeout`
+([src/lib/utils.ts:69](src/lib/utils.ts#L69)): the group load times out at ~15s
+and surfaces a save-error banner, the auth session read times out at ~10s and
+falls through to login. Lesson: never gate the whole shell on an unbounded
+network promise.
+
+**`TypeError: fetch failed` / `getaddrinfo ENOTFOUND *.supabase.co`** — the dev
+console floods with failed requests to Supabase. This is a transient local
+DNS/network hop (the machine's hostname changing mid-session will do it), **not
+an application bug**. Recheck connectivity and restart `npm run dev` once the
+network settles; no code change applies.
+
+**Hydration overlay on `<body>` (`data-gr-ext-installed`,
+`data-new-gr-c-s-check-loaded`)** — the red "tree hydrated but attributes didn't
+match" overlay in dev. Grammarly and similar browser extensions inject
+attributes onto `<body>` before React hydrates. Fixed with
+`suppressHydrationWarning` on `<body>` in
+[src/app/layout.tsx:62](src/app/layout.tsx#L62) — body-only, so genuine child
+mismatches still report. Worth knowing before chasing a phantom SSR bug.
+
+**Undo → Split forgot the previous custom split** — after approving a custom
+split, hitting Undo and reopening Split started over from an even split.
+`reopenExpense` deliberately clears `splits`/`splitMode` so a pending expense
+stops moving balances, and `draftFromExpense` existed to recover the prior
+answer but was never wired into the UI, so it was discarded before the dialog
+opened. Fixed by capturing the draft at Undo time and passing it as
+`initialDraft` to `SplitExpenseDialog`
+([ExpensesTab.tsx:155](src/components/tabs/ExpensesTab.tsx#L155)); the
+remembered draft is cleared if the amount is edited while pending. Covered by an
+e2e smoke test.
+
+Flexible splits live under **Expenses → Split**, available to the treasurer on
+pending expenses: *Evenly*, *Some of us*, *Amounts*, *Percent*.
+
+### Hardening
+
+Holes found in a production-readiness audit and closed since:
+
+- **Realtime refetch could clobber in-flight optimistic edits** → pending writes
+  are tracked and realtime refetches deferred while any are outstanding.
+- **Rapid edits could apply out of order** → `persistGroupDiff` is serialized per
+  group.
+- **Concurrent multi-tab or multi-roommate edits overwrote silently** →
+  `docs_version` counter, stale `update_group_docs` calls rejected, and a
+  reload-on-conflict path in the UI.
+- **Member removal left stale rent, utility, chore, and sub-group state** →
+  tested `removeMember()` cleanup, and removal is blocked while the balance is
+  non-zero.
+- **RLS and money-integrity holes** — non-treasurers could escalate, clients
+  could insert already-approved expenses and payments, update policies were too
+  broad, receipts were public, invite codes were short → column-guard triggers,
+  force-pending inserts, `SECURITY DEFINER` approve/deny/confirm RPCs, amount
+  `CHECK`s, private receipts behind signed URLs, longer invite codes.
+- **Missing production env validation** → a production build throws if the
+  Supabase env vars are absent; sandbox shows a demo-mode banner.
+
+**For maintainers:** shipping a11y changes broke Playwright selectors — tab
+buttons gained an "— needs attention" suffix, so exact accessible-name matches
+failed, and visually-hidden checkboxes need keyboard `Space` rather than
+`.uncheck()`. Prefer count and role assertions over matching money text.
 
 ---
 
@@ -270,63 +237,28 @@ once with `npx playwright install chromium`.
 
 ```
 src/
-├── app/
-│   ├── page.tsx             # Auth gating and which screen is showing
-│   ├── layout.tsx           # Root layout + AuthProvider
-│   ├── api/reminders/       # Cron-run digest of what's waiting on you
-│   ├── reset-password/      # Password reset (from email link)
-│   └── error.tsx            # Error boundaries
-├── components/
-│   ├── AppShell.tsx         # Header, navigation, and the open tab
-│   ├── screens/             # Auth, Welcome, CreateGroup, JoinGroup, Profile
-│   ├── tabs/                # Dashboard, Rent, Bills, Expenses, Floors,
-│   │                        # Chores, Settle, Group
-│   ├── dashboard/           # Balance hero, settlement lists, chore board
-│   ├── expenses/            # Expense form, row, receipt lightbox
-│   ├── periods/             # Monthly close-out and archive
-│   └── subgroups/           # One floor's card, members and bills
-├── context/AuthProvider.tsx # Supabase session + sign in/up/out/reset
-├── hooks/
-│   ├── useGroupStore.ts     # Group state, optimistic writes, rollback
-│   ├── useGroupRealtime.ts  # Live refetch, deferred while a write is saving
-│   └── useAppRoute.ts       # Screen, tab and group id in the URL
-├── lib/
-│   ├── api.ts               # Supabase reads/writes (diff-based persistence)
-│   ├── settlements.ts       # Smart + simple settlement algorithms
-│   ├── splits.ts            # Penny-exact even and weighted splits
-│   ├── expenseSplits.ts     # Even / subset / exact / percentage split modes
-│   ├── charges.ts           # Everything the house currently owes
-│   ├── periods.ts           # Monthly close-out, carry-forward, archive
-│   ├── members.ts           # Safe member removal and rent re-splitting
-│   ├── chores.ts            # Rotation, due dates, calendar projection
-│   ├── csv.ts               # Ledger export (formula-injection safe)
-│   ├── reminders.ts         # Who is owed a nudge, and what it says
-│   └── receipts.ts          # Private storage uploads + signed URLs
-├── proxy.ts                 # Session cookie refresh (Next.js 16 Proxy)
-e2e/                         # Playwright smoke tests (sandbox mode)
+├── app/            # App Router: auth gating, reminders cron route, password reset
+├── components/     # AppShell, screens/, tabs/, dashboard/, expenses/, periods/
+├── context/        # Supabase session provider
+├── hooks/          # Group store (optimistic writes), realtime, URL routing
+└── lib/            # settlements · splits · charges · periods · members · chores
+                    # · csv · reminders · receipts · api (diff persistence)
+e2e/                # Playwright smoke tests (sandbox mode)
 supabase/
-├── migrations/              # Tables, RLS, RPCs, storage, realtime
-└── tests/                   # pgTAP suites proving the RLS rules hold
+├── migrations/     # Tables, RLS, RPCs, storage, realtime
+└── tests/          # pgTAP suites proving the RLS rules hold
 ```
 
 ---
 
 ## Deployment
 
-Deployed on [Vercel](https://vercel.com): import the repo and set
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, then add the
+Deployed on [Vercel](https://vercel.com): import the repo, set
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and add the
 production domain to Supabase's auth URL configuration. `vercel.json` schedules
-the daily reminder job.
-
-Auth emails go out through [Resend](https://resend.com) SMTP rather than
-Supabase's built-in sender, which is capped at roughly two emails an hour and
-isn't meant for production — configured under **Authentication → Emails → SMTP
-Settings** with no code changes. Optional integrations (Sentry, reminder emails)
-are each fully optional: without their environment variables the app runs
-normally, and the reminder endpoint returns a 501 naming exactly what's missing.
-
-Migrations are append-only and safe to re-run — to change something, add a new
-file rather than editing one that has already run against live data.
+the daily reminder job; auth emails go through [Resend](https://resend.com) SMTP.
+Sentry and reminder emails are optional — without their env vars the app runs
+normally. Migrations are append-only and safe to re-run.
 
 ---
 
