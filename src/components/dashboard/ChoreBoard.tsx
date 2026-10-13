@@ -6,6 +6,7 @@ import {
   todayISO,
   addDaysISO,
   choreStatus,
+  isChoreComplete,
   projectOccurrences,
 } from "@/lib/chores";
 import type { Chore, Member } from "@/lib/types";
@@ -35,7 +36,7 @@ export default function ChoreBoard({
   const { byId, indexOf } = roster(members);
   const today = todayISO();
   const dueToday = chores
-    .filter((c) => c.nextDue <= today)
+    .filter((c) => !isChoreComplete(c) && c.nextDue <= today)
     .sort((a, b) => a.nextDue.localeCompare(b.nextDue));
   const tomorrow = addDaysISO(today, 1);
   const dueTomorrow = projectOccurrences(chores, tomorrow, tomorrow);
@@ -121,6 +122,7 @@ export default function ChoreBoard({
                         <button
                           onClick={() => onDone(chore.id)}
                           disabled={!mine}
+                          aria-label={`Mark ${chore.name} done`}
                           title={
                             mine
                               ? undefined

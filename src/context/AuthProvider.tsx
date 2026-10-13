@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { HAS_SUPABASE } from "@/lib/config";
+import { HAS_SUPABASE, SITE_URL } from "@/lib/config";
 
 interface SignUpArgs {
   email: string;
@@ -32,6 +32,11 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AUTH_TIMEOUT_MS = 10000;
+const EMAIL_CONFIRM_REDIRECT_URL = new URL("/", SITE_URL).toString();
+const PASSWORD_RESET_REDIRECT_URL = new URL(
+  "/reset-password",
+  SITE_URL
+).toString();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => (HAS_SUPABASE ? createClient() : null), []);
@@ -90,7 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { name: name.trim(), venmo: venmo.trim() } },
+          options: {
+            data: { name: name.trim(), venmo: venmo.trim() },
+            emailRedirectTo: EMAIL_CONFIRM_REDIRECT_URL,
+          },
         });
         if (error) return { error: error.message, needsConfirmation: false };
         // Supabase obfuscates duplicate signups (to prevent email enumeration):
@@ -114,12 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!supabase) return { error: "Backend not configured" };
         const { error } = await supabase.auth.resetPasswordForEmail(
           email.trim(),
-          {
-            redirectTo:
-              typeof window !== "undefined"
-                ? `${window.location.origin}/reset-password`
-                : undefined,
-          }
+          { redirectTo: PASSWORD_RESET_REDIRECT_URL }
         );
         return { error: error?.message ?? null };
       },
@@ -132,9 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // link it emails, so the session's email won't change immediately.
       updateEmail: async (email) => {
         if (!supabase) return { error: "Backend not configured" };
-        const { error } = await supabase.auth.updateUser({
-          email: email.trim(),
-        });
+        const { error } = await supabase.auth.updateUser(
+          { email: email.trim() },
+          { emailRedirectTo: EMAIL_CONFIRM_REDIRECT_URL }
+        );
         return { error: error?.message ?? null };
       },
     }),

@@ -169,9 +169,13 @@ the screenshots above are this mode.
 2. `npx supabase link --project-ref <ref>` then `npm run db:push` to apply
    migrations (tables, RLS, RPCs, storage buckets, realtime publication).
 3. Copy `.env.example` to `.env.local` and fill in the project URL and anon key.
-4. In **Authentication → URL Configuration**, set the site URL and add
-   `/reset-password` as a redirect URL.
-5. `npm run dev`.
+4. In **Authentication → URL Configuration**, set **Site URL** to the exact
+   production origin (`https://divvyup.site`, with no wildcard). Add
+   `https://divvyup.site/**` and `http://localhost:3000/**` under **Redirect
+   URLs**. Wildcards belong in this allow-list, never in **Site URL**.
+5. Set `NEXT_PUBLIC_SITE_URL=https://divvyup.site` in the Vercel production
+   environment, then redeploy. Auth email links use this canonical origin.
+6. `npm run dev`.
 
 | Script | Purpose |
 |--------|---------|

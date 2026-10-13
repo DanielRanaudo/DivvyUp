@@ -189,18 +189,58 @@ function reassignChore(
   remainingIds: string[]
 ): Chore {
   const rotationIds = chore.rotationIds.filter((id) => id !== removedId);
-  const rotationIndex =
-    rotationIds.length > 0 ? chore.rotationIndex % rotationIds.length : 0;
 
-  let assigneeId = chore.assigneeId;
-  if (assigneeId === removedId) {
-    assigneeId =
-      chore.assignMode === "rotation" && rotationIds.length > 0
-        ? rotationIds[rotationIndex]
-        : remainingIds[0] ?? "";
+  if (chore.assignMode === "rotation") {
+    if (rotationIds.length === 0) {
+      // The last person in this rotation left. Keep the chore usable as a
+      // fixed assignment instead of leaving a "rotation" with nobody in it.
+      return {
+        ...chore,
+        assignMode: "fixed",
+        rotationIds: [],
+        rotationIndex: 0,
+        assigneeId: remainingIds[0] ?? "",
+      };
+    }
+
+    let assigneeId = chore.assigneeId;
+    if (!rotationIds.includes(assigneeId)) {
+      const originalLength = chore.rotationIds.length;
+      const assignedIndex = chore.rotationIds.indexOf(chore.assigneeId);
+      const savedIndex =
+        originalLength > 0
+          ? ((Math.trunc(chore.rotationIndex) % originalLength) +
+              originalLength) %
+            originalLength
+          : 0;
+      const currentIndex = assignedIndex >= 0 ? assignedIndex : savedIndex;
+
+      // Hand the current turn to the next roommate who is still in the
+      // rotation. This preserves the original order when the assignee leaves.
+      for (let step = 1; step <= originalLength; step++) {
+        const candidate = chore.rotationIds[
+          (currentIndex + step) % originalLength
+        ];
+        if (rotationIds.includes(candidate)) {
+          assigneeId = candidate;
+          break;
+        }
+      }
+    }
+
+    const rotationIndex = Math.max(0, rotationIds.indexOf(assigneeId));
+    return { ...chore, rotationIds, rotationIndex, assigneeId };
   }
 
-  return { ...chore, rotationIds, rotationIndex, assigneeId };
+  return {
+    ...chore,
+    rotationIds,
+    rotationIndex: 0,
+    assigneeId:
+      chore.assigneeId === removedId
+        ? remainingIds[0] ?? ""
+        : chore.assigneeId,
+  };
 }
 
 /**

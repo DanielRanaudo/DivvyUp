@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { canRemoveMember, memberBalance, removeMember } from "@/lib/members";
+import { completeChore } from "@/lib/chores";
 import { calcBalances } from "@/lib/settlements";
 import { evenSplit } from "@/lib/splits";
 import type { Charge, Group, Member } from "@/lib/types";
@@ -311,9 +312,88 @@ describe("removeMember", () => {
     const { group: next } = removeMember(g, "c");
 
     expect(next.chores[0].rotationIds).toEqual(["a", "b"]);
-    expect(next.chores[0].rotationIndex).toBeLessThan(2);
-    expect(next.chores[0].assigneeId).not.toBe("c");
-    expect(["a", "b"]).toContain(next.chores[0].assigneeId);
+    expect(next.chores[0].rotationIndex).toBe(0);
+    expect(next.chores[0].assigneeId).toBe("a");
+  });
+
+  it("preserves the next turn when someone before the assignee leaves", () => {
+    const g = group({
+      chores: [
+        {
+          id: "ch1",
+          name: "Dishes",
+          icon: "🍽️",
+          everyDays: 1,
+          nextDue: "2026-07-28",
+          assignMode: "rotation",
+          assigneeId: "b",
+          rotationIds: ["a", "b", "c"],
+          rotationIndex: 1,
+          history: [],
+        },
+      ],
+    });
+
+    const { group: next } = removeMember(g, "a");
+    const chore = next.chores[0];
+    expect(chore.rotationIds).toEqual(["b", "c"]);
+    expect(chore.assigneeId).toBe("b");
+    expect(chore.rotationIndex).toBe(0);
+
+    const done = completeChore(chore);
+    expect(done.assigneeId).toBe("c");
+    expect(done.rotationIndex).toBe(1);
+  });
+
+  it("hands a removed assignee's turn to the next person in rotation", () => {
+    const g = group({
+      chores: [
+        {
+          id: "ch1",
+          name: "Dishes",
+          icon: "🍽️",
+          everyDays: 1,
+          nextDue: "2026-07-28",
+          assignMode: "rotation",
+          assigneeId: "b",
+          rotationIds: ["a", "b", "c"],
+          rotationIndex: 1,
+          history: [],
+        },
+      ],
+    });
+
+    const { group: next } = removeMember(g, "b");
+    expect(next.chores[0].rotationIds).toEqual(["a", "c"]);
+    expect(next.chores[0].assigneeId).toBe("c");
+    expect(next.chores[0].rotationIndex).toBe(1);
+  });
+
+  it("turns an empty rotation into a valid fixed assignment", () => {
+    const g = group({
+      chores: [
+        {
+          id: "ch1",
+          name: "Dishes",
+          icon: "🍽️",
+          everyDays: 1,
+          nextDue: "2026-07-28",
+          assignMode: "rotation",
+          assigneeId: "c",
+          rotationIds: ["c"],
+          rotationIndex: 0,
+          history: [],
+        },
+      ],
+    });
+
+    const { group: next } = removeMember(g, "c");
+    expect(next.chores[0]).toMatchObject({
+      assignMode: "fixed",
+      assigneeId: "a",
+      rotationIds: [],
+      rotationIndex: 0,
+    });
   });
 
   it("keeps the remaining balances summing to zero", () => {

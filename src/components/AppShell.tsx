@@ -179,6 +179,7 @@ export default function AppShell({
             group={group}
             setGroup={setGroup}
             currentUser={currentUser}
+            isTreasurer={isTreasurer}
           />
         )}
         {tab === "settle" && (

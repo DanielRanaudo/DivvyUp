@@ -7,6 +7,7 @@ import {
   todayISO,
   addDaysISO,
   completeChore,
+  isChoreComplete,
   projectOccurrences,
 } from "@/lib/chores";
 import type { Group, Member, Chore } from "@/lib/types";
@@ -20,12 +21,14 @@ interface ChoresTabProps {
   group: Group;
   setGroup: (updater: (prev: Group) => Group) => void;
   currentUser: Member;
+  isTreasurer: boolean;
 }
 
 export default function ChoresTab({
   group,
   setGroup,
   currentUser,
+  isTreasurer,
 }: ChoresTabProps) {
   const chores = group.chores ?? [];
   const members = roster(group.members);
@@ -53,7 +56,7 @@ export default function ChoresTab({
   // household can see what still needs doing. "Tomorrow" is a personal
   // heads-up: only the chores the current user is handed next.
   const dueToday = chores
-    .filter((c) => c.nextDue <= today)
+    .filter((c) => !isChoreComplete(c) && c.nextDue <= today)
     .sort((a, b) => a.nextDue.localeCompare(b.nextDue));
   const mineTomorrow = projectOccurrences(
     chores,
@@ -141,6 +144,7 @@ export default function ChoresTab({
                         chore={chore}
                         members={members}
                         currentUserId={currentUser.id}
+                        canDelete={isTreasurer}
                         onDone={markDone}
                         onDelete={removal.ask}
                       />

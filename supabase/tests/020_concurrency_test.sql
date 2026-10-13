@@ -10,7 +10,7 @@
 begin;
 set local search_path = public, extensions, tests;
 
-select plan(11);
+select plan(14);
 
 select tests.logout();
 delete from tests.ctx;
@@ -86,6 +86,31 @@ select is(
   ),
   2,
   'the second editor succeeds once they have refetched'
+);
+
+select throws_ok(
+  format(
+    'select public.update_group_docs(%L, ''[]''::jsonb, ''[{"id":"b"}]''::jsonb, 2)',
+    tests.recall('group')
+  ),
+  'Only the treasurer can delete chores',
+  'a member cannot delete another roommate''s chore'
+);
+
+select is(
+  (select chores from public.groups where id = tests.recall_uuid('group')),
+  '[{"id":"a"},{"id":"b"}]'::jsonb,
+  'the refused deletion leaves every chore intact'
+);
+
+select tests.login_as(tests.recall_uuid('dev'));
+
+select is(
+  public.update_group_docs(
+    tests.recall_uuid('group'), '[]'::jsonb, '[{"id":"b"}]'::jsonb, 2
+  ),
+  3,
+  'the treasurer can delete a chore'
 );
 
 select tests.login_as(tests.recall_uuid('outsider'));

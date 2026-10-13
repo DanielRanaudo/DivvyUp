@@ -22,6 +22,15 @@ const MONTH = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 }).format(new Date());
 
+function localDateISO(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function createGroup(page: Page, name: string) {
   await page.goto("/");
   await page.getByRole("button", { name: "Start a Group" }).click();
@@ -336,4 +345,88 @@ test("a bill is not deleted on the first click", async ({ page }) => {
   await page.getByRole("button", { name: "Delete Internet" }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText("Internet")).toHaveCount(0);
+});
+
+test("chores complete once and rotate through roommates in order", async ({
+  page,
+}) => {
+  await createGroup(page, "Chore House");
+  await openTab(page, "Chores");
+
+  // The furnished sandbox starts with a rotating task due today. Completing
+  // it moves the date forward and hands the next occurrence to Alex.
+  await expect(page.getByText("then → Alex")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Mark Take out trash done" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Mark Take out trash done" })
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Take out trash · Alex").first()).toBeVisible();
+
+  // A one-off closes after one click: it leaves both the due list and future
+  // calendar rather than staying due and accepting duplicate completions.
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Name").fill("Clean fridge");
+  await page.getByLabel("Every (days)").fill("0");
+  await page.getByRole("button", { name: "Add Chore" }).click();
+  await page
+    .getByRole("button", { name: "Mark Clean fridge done" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Mark Clean fridge done" })
+  ).toHaveCount(0);
+  await expect(page.getByLabel(/Clean fridge ·/)).toHaveCount(0);
+
+  // Catching up an overdue rotation records each scheduled occurrence. The
+  // first click moves yesterday's turn from You to Alex for today; Alex's click
+  // then hands tomorrow to Jordan.
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Name").fill("Rotate bins");
+  await page.getByLabel("Every (days)").fill("1");
+  await page.getByLabel("First due").fill(localDateISO(-1));
+  await page.getByRole("button", { name: "Rotate", exact: true }).click();
+  const rotation = page.getByRole("group", { name: /Rotate between/ });
+  await rotation.getByRole("button").filter({ hasText: "Alex" }).click();
+  await rotation.getByRole("button").filter({ hasText: "Jordan" }).click();
+  await page.getByRole("button", { name: "Add Chore" }).click();
+
+  const markBinsDone = page.getByRole("button", {
+    name: "Mark Rotate bins done",
+  });
+  await expect(page.getByText("then → Alex")).toBeVisible();
+  await markBinsDone.click();
+  await expect(markBinsDone).toBeDisabled();
+  await expect(page.getByText("then → Jordan")).toBeVisible();
+
+  await viewAs(page, "Alex");
+  await expect(markBinsDone).toBeEnabled();
+  await markBinsDone.click();
+  await expect(markBinsDone).toHaveCount(0);
+  await expect(page.getByLabel("Rotate bins · Jordan").first()).toBeVisible();
+
+  await viewAs(page, "Jordan");
+  await expect(page.getByText(/Yours tomorrow ·/)).toBeVisible();
+});
+
+test("only the treasurer can delete a chore", async ({ page }) => {
+  await createGroup(page, "Chore Permissions House");
+  await openTab(page, "Chores");
+
+  await expect(
+    page.getByRole("button", { name: "Delete Take out trash" })
+  ).toBeVisible();
+
+  await viewAs(page, "Jordan");
+  await expect(
+    page.getByRole("button", { name: "Delete Take out trash" })
+  ).toHaveCount(0);
+
+  await viewAs(page, "You (Treasurer)");
+  await page.getByRole("button", { name: "Delete Take out trash" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page.getByText("Take out trash")).toHaveCount(0);
 });

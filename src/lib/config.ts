@@ -7,9 +7,18 @@ export const HAS_SUPABASE = SUPABASE_URL !== "" && SUPABASE_ANON_KEY !== "";
 
 export const USE_BACKEND = !IS_SANDBOX && HAS_SUPABASE;
 
-/** Absolute origin, used to resolve Open Graph and manifest URLs. */
+/**
+ * Canonical absolute origin for public links and auth email redirects.
+ *
+ * Keep a production fallback so a missing Vercel variable cannot send account
+ * emails to localhost or an old deployment alias. Preview builds deliberately
+ * use the canonical site too: auth emails should always return to the real app.
+ */
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  (process.env.NODE_ENV === "production"
+    ? "https://divvyup.site"
+    : "http://localhost:3000");
 
 /**
  * Demo mode keeps everything in memory, which is the right default for `npm run
