@@ -18,6 +18,7 @@ import {
 import { uploadAvatar, AVATAR_MAX_DIM } from "@/lib/avatars";
 import { fileToCompressedBlob, fileToCompressedDataURL } from "@/lib/image";
 import { buildCharges } from "@/lib/charges";
+import { addMemberToSmartRotations } from "@/lib/chores";
 import { closePeriod, periodKey } from "@/lib/periods";
 import { localGroup } from "@/lib/sandbox";
 import { uid, withTimeout } from "@/lib/utils";
@@ -345,7 +346,13 @@ export function useGroupStore({
       };
       applyGroups((prev) =>
         prev.map((g) =>
-          g.id === groupId ? { ...g, members: [...g.members, you] } : g
+          g.id === groupId
+            ? {
+                ...g,
+                members: [...g.members, you],
+                chores: addMemberToSmartRotations(g.chores ?? [], you.id),
+              }
+            : g
         )
       );
       setMyMemberIds((prev) => ({ ...prev, [groupId]: you.id }));

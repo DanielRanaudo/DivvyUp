@@ -104,9 +104,9 @@ one now has a test proving it stays closed.
 
 | Layer | Tool | Covers |
 |---|---|---|
-| **209 unit tests** (16 files) | Vitest | Money logic — splits, settlements, chore rotation, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
-| **11 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
-| **59 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
+| **226 unit tests** (16 files) | Vitest | Money logic — splits, settlements, chore rotation, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
+| **14 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
+| **69 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
 
 All three run in GitHub Actions on every push and PR, alongside lint, typecheck,
 and a production build.
@@ -146,7 +146,7 @@ shipping an in-memory demo) · Sentry reports carrying user id only.
 | **Testing** | Vitest, Playwright, pgTAP |
 | **Ops** | GitHub Actions CI, Vercel (+ Cron), Sentry, Resend SMTP, Dependabot |
 
-~17k lines of TypeScript and ~2.5k lines of SQL, hand-written across six migrations.
+~17k lines of TypeScript and ~2.5k lines of SQL, hand-written across nine migrations.
 
 ---
 

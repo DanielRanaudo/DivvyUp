@@ -8,11 +8,14 @@ import { blockNegativeKeys, isNonNegativeInput } from "@/lib/inputs";
 import { todayISO } from "@/lib/chores";
 import type { Chore, Member } from "@/lib/types";
 import Avatar from "@/components/Avatar";
+import Toggle from "@/components/Toggle";
 
 interface ChoreFormProps {
   members: Member[];
   currentUser: Member;
-  onAdd: (chore: Chore) => void;
+  /** Present when the treasurer is changing an existing schedule. */
+  initialChore?: Chore;
+  onSubmit: (chore: Chore) => void;
 }
 
 const DEFAULT_ICON = "🧹";
@@ -21,16 +24,32 @@ const DEFAULT_ICON = "🧹";
 export default function ChoreForm({
   members,
   currentUser,
-  onAdd,
+  initialChore,
+  onSubmit,
 }: ChoreFormProps) {
   const { indexOf } = roster(members);
-  const [name, setName] = useState("");
-  const [icon, setIcon] = useState(DEFAULT_ICON);
-  const [everyDays, setEveryDays] = useState("2");
-  const [startDate, setStartDate] = useState(todayISO());
-  const [assignMode, setAssignMode] = useState<"fixed" | "rotation">("fixed");
-  const [fixedAssignee, setFixedAssignee] = useState(currentUser.id);
-  const [rotationIds, setRotationIds] = useState<string[]>([currentUser.id]);
+  const [name, setName] = useState(initialChore?.name ?? "");
+  const [icon, setIcon] = useState(initialChore?.icon ?? DEFAULT_ICON);
+  const [everyDays, setEveryDays] = useState(
+    String(initialChore?.everyDays ?? 2)
+  );
+  const [startDate, setStartDate] = useState(
+    initialChore?.nextDue ?? todayISO()
+  );
+  const [assignMode, setAssignMode] = useState<"fixed" | "rotation">(
+    initialChore?.assignMode ?? "fixed"
+  );
+  const [smartRotation, setSmartRotation] = useState(
+    initialChore ? Boolean(initialChore.smartRotation) : true
+  );
+  const [fixedAssignee, setFixedAssignee] = useState(
+    initialChore?.assigneeId ?? currentUser.id
+  );
+  const [rotationIds, setRotationIds] = useState<string[]>(
+    initialChore?.rotationIds.length
+      ? initialChore.rotationIds
+      : [initialChore?.assigneeId ?? currentUser.id]
+  );
 
   const canSubmit = Boolean(
     name.trim() &&
@@ -43,25 +62,66 @@ export default function ChoreForm({
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
+  const memberIds = members.map((member) => member.id);
+
+  const chooseAssignmentMode = (mode: "fixed" | "rotation") => {
+    setAssignMode(mode);
+    if (mode === "rotation" && smartRotation) setRotationIds(memberIds);
+  };
+
+  const changeSmartRotation = (next: boolean) => {
+    setSmartRotation(next);
+    setRotationIds(
+      next
+        ? memberIds
+        : [
+            members.some((member) => member.id === fixedAssignee)
+              ? fixedAssignee
+              : currentUser.id,
+          ]
+    );
+  };
+
   const submit = () => {
     if (!canSubmit) return;
     const days = parseInt(everyDays, 10);
-    onAdd({
-      id: uid(),
+    const assigneeId =
+      assignMode === "fixed"
+        ? fixedAssignee
+        : initialChore && rotationIds.includes(initialChore.assigneeId)
+          ? initialChore.assigneeId
+          : rotationIds[0];
+
+    onSubmit({
+      id: initialChore?.id ?? uid(),
       name: name.trim(),
       icon: icon.trim() || DEFAULT_ICON,
       everyDays: isNaN(days) || days < 0 ? 0 : days,
       nextDue: startDate,
       assignMode,
-      assigneeId: assignMode === "fixed" ? fixedAssignee : rotationIds[0],
+      smartRotation: assignMode === "rotation" && smartRotation,
+      assigneeId,
       rotationIds: assignMode === "rotation" ? rotationIds : [],
-      rotationIndex: 0,
-      history: [],
+      rotationIndex:
+        assignMode === "rotation" ? rotationIds.indexOf(assigneeId) : 0,
+      // Editing a schedule must not erase its audit trail.
+      history: initialChore?.history ?? [],
     });
   };
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20, maxWidth: 560 }}>
+      {initialChore && (
+        <h3
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            margin: "0 0 14px",
+          }}
+        >
+          Editing &ldquo;{initialChore.name}&rdquo;
+        </h3>
+      )}
       <div
         style={{
           display: "grid",
@@ -126,7 +186,7 @@ export default function ChoreForm({
         </div>
         <div>
           <label style={labelStyle} htmlFor="chore-first-due">
-            First due
+            {initialChore ? "Next due" : "First due"}
           </label>
           <input
             id="chore-first-due"
@@ -150,7 +210,7 @@ export default function ChoreForm({
           {(["fixed", "rotation"] as const).map((mode) => (
             <button
               key={mode}
-              onClick={() => setAssignMode(mode)}
+              onClick={() => chooseAssignmentMode(mode)}
               aria-pressed={assignMode === mode}
               style={{
                 flex: 1,
@@ -192,8 +252,44 @@ export default function ChoreForm({
         </div>
       ) : (
         <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              padding: "10px 12px",
+              marginBottom: 12,
+              borderRadius: T.radiusSm,
+              background: T.bg,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                Smart rotation
+              </div>
+              <div
+                style={{
+                  color: T.secondary,
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  marginTop: 2,
+                }}
+              >
+                Includes everyone, adds future roommates, and balances who
+                starts new chores.
+              </div>
+            </div>
+            <Toggle
+              checked={smartRotation}
+              onChange={changeSmartRotation}
+              label="Smart rotation"
+            />
+          </div>
           <div style={labelStyle} id="chore-rotation">
-            Rotate between (in order, {rotationIds.length} selected)
+            {smartRotation
+              ? `Everyone (${rotationIds.length} roommates)`
+              : `Rotate between (in order, ${rotationIds.length} selected)`}
           </div>
           <div
             role="group"
@@ -205,6 +301,7 @@ export default function ChoreForm({
               return (
                 <button
                   key={m.id}
+                  disabled={smartRotation}
                   onClick={() => toggleRotationMember(m.id)}
                   aria-pressed={selected}
                   style={{
@@ -217,7 +314,7 @@ export default function ChoreForm({
                       : "1px solid transparent",
                     borderRadius: 20,
                     padding: "4px 10px 4px 4px",
-                    cursor: "pointer",
+                    cursor: smartRotation ? "default" : "pointer",
                     fontFamily: T.font,
                   }}
                 >
@@ -259,7 +356,7 @@ export default function ChoreForm({
           cursor: canSubmit ? "pointer" : "default",
         }}
       >
-        Add Chore
+        {initialChore ? "Save Changes" : "Add Chore"}
       </button>
     </div>
   );

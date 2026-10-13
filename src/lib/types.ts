@@ -114,6 +114,8 @@ export interface Chore {
   everyDays: number;
   nextDue: string;
   assignMode: "fixed" | "rotation";
+  /** Includes every member and automatically enrolls future roommates. */
+  smartRotation?: boolean;
   assigneeId: string;
   rotationIds: string[];
   rotationIndex: number;

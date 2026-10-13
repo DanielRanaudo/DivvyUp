@@ -7,6 +7,7 @@ import {
   todayISO,
   addDaysISO,
   completeChore,
+  balanceSmartRotationStart,
   isChoreComplete,
   projectOccurrences,
 } from "@/lib/chores";
@@ -24,6 +25,11 @@ interface ChoresTabProps {
   isTreasurer: boolean;
 }
 
+type FormState =
+  | { kind: "closed" }
+  | { kind: "new" }
+  | { kind: "edit"; id: string };
+
 export default function ChoresTab({
   group,
   setGroup,
@@ -32,14 +38,28 @@ export default function ChoresTab({
 }: ChoresTabProps) {
   const chores = group.chores ?? [];
   const members = roster(group.members);
-  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<FormState>({ kind: "closed" });
+  const editing =
+    form.kind === "edit"
+      ? (chores.find((chore) => chore.id === form.id) ?? null)
+      : null;
 
   const editChores = (change: (chores: Chore[]) => Chore[]) =>
     setGroup((prev) => ({ ...prev, chores: change(prev.chores ?? []) }));
 
   const addChore = (chore: Chore) => {
-    editChores((prev) => [...prev, chore]);
-    setShowForm(false);
+    editChores((prev) => [
+      ...prev,
+      balanceSmartRotationStart(chore, prev),
+    ]);
+    setForm({ kind: "closed" });
+  };
+
+  const saveChore = (chore: Chore) => {
+    editChores((prev) =>
+      prev.map((existing) => (existing.id === chore.id ? chore : existing))
+    );
+    setForm({ kind: "closed" });
   };
 
   const markDone = (choreId: string) =>
@@ -81,34 +101,117 @@ export default function ChoresTab({
           </p>
         </div>
         <button
-          onClick={() => setShowForm((open) => !open)}
+          onClick={() =>
+            setForm((current) =>
+              current.kind === "closed" ? { kind: "new" } : { kind: "closed" }
+            )
+          }
           style={{
             padding: "8px 16px",
             borderRadius: 20,
             border: "none",
-            background: showForm ? T.bg : T.blue,
-            color: showForm ? T.text : "#fff",
+            background: form.kind === "closed" ? T.blue : T.bg,
+            color: form.kind === "closed" ? "#fff" : T.text,
             fontFamily: T.font,
             fontSize: 14,
             fontWeight: 600,
             cursor: "pointer",
           }}
         >
-          {showForm ? "Cancel" : "+ Add"}
+          {form.kind === "closed" ? "+ Add" : "Cancel"}
         </button>
       </div>
 
-      {showForm && (
+      {form.kind === "new" && (
         // Remounting on close throws the half-filled form away, which is what
         // "Cancel" is understood to mean.
         <ChoreForm
           members={group.members}
           currentUser={currentUser}
-          onAdd={addChore}
+          onSubmit={addChore}
         />
       )}
 
-      {chores.length === 0 && !showForm && (
+      {editing && isTreasurer && (
+        <ChoreForm
+          key={editing.id}
+          members={group.members}
+          currentUser={currentUser}
+          initialChore={editing}
+          onSubmit={saveChore}
+        />
+      )}
+
+      {isTreasurer && chores.some((chore) => !isChoreComplete(chore)) && (
+        <div style={{ marginBottom: 20 }}>
+          <DayLabel color={T.secondary}>Manage schedules</DayLabel>
+          <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+            {chores
+              .filter((chore) => !isChoreComplete(chore))
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((chore, index, activeChores) => (
+                <div
+                  key={chore.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    borderBottom:
+                      index < activeChores.length - 1
+                        ? `1px solid ${T.border}`
+                        : "none",
+                  }}
+                >
+                  <span aria-hidden="true" style={{ fontSize: 18 }}>
+                    {chore.icon}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>
+                      {chore.name}
+                    </div>
+                    <div style={{ fontSize: 12, color: T.tertiary }}>
+                      {chore.everyDays <= 0
+                        ? "One time"
+                        : chore.everyDays === 1
+                          ? "Daily"
+                          : `Every ${chore.everyDays} days`}
+                      {" · "}
+                      {chore.assignMode === "rotation"
+                        ? `${chore.smartRotation ? "Smart · " : ""}${
+                            chore.rotationIds.length
+                          }-person rotation · ${
+                            chore.history.length === 0
+                              ? "starts with"
+                              : "current turn"
+                          } ${members.nameOf(chore.assigneeId)}`
+                        : members.nameOf(chore.assigneeId)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setForm({ kind: "edit", id: chore.id })}
+                    aria-label={`Edit ${chore.name}`}
+                    style={{
+                      background: "none",
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 8,
+                      padding: "5px 12px",
+                      color: T.blue,
+                      fontFamily: T.font,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {chores.length === 0 && form.kind === "closed" && (
         <div
           style={{
             textAlign: "center",

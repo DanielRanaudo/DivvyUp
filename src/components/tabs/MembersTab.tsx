@@ -5,7 +5,11 @@ import { T, cardStyle, secTitle } from "@/lib/tokens";
 import { payContactLine } from "@/lib/profile";
 import type { Group, Member, Charge } from "@/lib/types";
 import { calcSimpleSettlements, calcSmartSettlements } from "@/lib/settlements";
-import { canRemoveMember, removeMember } from "@/lib/members";
+import {
+  canRemoveMember,
+  removeMember,
+  transferTreasurerRole,
+} from "@/lib/members";
 import Avatar from "@/components/Avatar";
 import Toggle from "@/components/Toggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -92,13 +96,7 @@ export default function MembersTab({
   const confirmTransfer = () => {
     if (!pendingTransfer) return;
     const name = transferTarget?.name ?? "They";
-    setGroup((prev) => ({
-      ...prev,
-      members: prev.members.map((m) => ({
-        ...m,
-        isTreasurer: m.id === pendingTransfer,
-      })),
-    }));
+    setGroup((prev) => transferTreasurerRole(prev, pendingTransfer));
     setPendingTransfer(null);
     setNotice(`${name} is now the treasurer.`);
   };
@@ -302,7 +300,7 @@ export default function MembersTab({
         title={`Make ${transferTarget?.name ?? "member"} treasurer?`}
         message={`${
           transferTarget?.name ?? "They"
-        } will be able to set rent, add bills, and approve expenses. You'll lose those abilities.`}
+        } will collect the open rent and household bills, and will be able to edit chore schedules, set rent, add bills, and approve expenses. You'll lose those abilities.`}
         confirmLabel="Hand over"
         onConfirm={confirmTransfer}
         onCancel={() => setPendingTransfer(null)}

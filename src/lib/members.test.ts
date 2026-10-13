@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { canRemoveMember, memberBalance, removeMember } from "@/lib/members";
+import {
+  canRemoveMember,
+  memberBalance,
+  removeMember,
+  transferTreasurerRole,
+} from "@/lib/members";
 import { completeChore } from "@/lib/chores";
+import { buildCharges } from "@/lib/charges";
 import { calcBalances } from "@/lib/settlements";
 import { evenSplit } from "@/lib/splits";
 import type { Charge, Group, Member } from "@/lib/types";
@@ -42,6 +48,53 @@ function rentCharge(g: Group): Charge[] {
     },
   ];
 }
+
+describe("transferTreasurerRole", () => {
+  it("moves open rent and utility balances to the new treasurer", () => {
+    const before = group({
+      rent: {
+        id: "rent",
+        amount: 6000,
+        splitType: "equal",
+        recurring: true,
+        percentages: {},
+        customs: {},
+        splits: { a: 2000, b: 2000, c: 2000 },
+      },
+      utilities: [
+        {
+          id: "power",
+          name: "Power",
+          amount: 300,
+          recurring: true,
+          splits: { a: 100, b: 100, c: 100 },
+          date: "2026-10-01",
+        },
+      ],
+    });
+
+    const beforeBalances = calcBalances(
+      before.members,
+      buildCharges(before),
+      before.payments
+    );
+    expect(beforeBalances).toMatchObject({ a: 4200, b: -2100, c: -2100 });
+
+    const after = transferTreasurerRole(before, "b");
+    const charges = buildCharges(after);
+    const afterBalances = calcBalances(after.members, charges, after.payments);
+
+    expect(after.members.find((m) => m.id === "a")?.isTreasurer).toBe(false);
+    expect(after.members.find((m) => m.id === "b")?.isTreasurer).toBe(true);
+    expect(charges.every((charge) => charge.paidBy === "b")).toBe(true);
+    expect(afterBalances).toMatchObject({ a: -2100, b: 4200, c: -2100 });
+  });
+
+  it("does nothing when the target is not a member", () => {
+    const before = group();
+    expect(transferTreasurerRole(before, "missing")).toBe(before);
+  });
+});
 
 describe("memberBalance", () => {
   it("is zero for a member with no activity", () => {

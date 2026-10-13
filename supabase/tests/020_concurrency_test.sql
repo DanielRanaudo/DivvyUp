@@ -1,5 +1,5 @@
 -- ============================================================================
--- Covers 20260727130000_concurrency.sql and 20260727140000_preserve_history.sql
+-- Covers concurrency/history plus chore authorization and smart rotations.
 -- ============================================================================
 -- Chores and subgroups are stored as whole JSON documents, so the only thing
 -- standing between two simultaneous editors and a silently discarded edit is the
@@ -10,7 +10,7 @@
 begin;
 set local search_path = public, extensions, tests;
 
-select plan(14);
+select plan(21);
 
 select tests.logout();
 delete from tests.ctx;
@@ -18,6 +18,9 @@ delete from tests.ctx;
 select tests.remember('dev', tests.create_user('dev@example.com', 'Dev')::text);
 select tests.remember('rae', tests.create_user('rae@example.com', 'Rae')::text);
 select tests.remember('outsider', tests.create_user('nope@example.com', 'Nope')::text);
+select tests.remember(
+  'newcomer', tests.create_user('newcomer@example.com', 'Newcomer')::text
+);
 
 select tests.login_as(tests.recall_uuid('dev'));
 select tests.remember('group', public.create_group('Maple St')::text);
@@ -111,6 +114,157 @@ select is(
   ),
   3,
   'the treasurer can delete a chore'
+);
+
+select is(
+  public.update_group_docs(
+    tests.recall_uuid('group'),
+    '[]'::jsonb,
+    jsonb_build_array(jsonb_build_object(
+      'id', 'assigned',
+      'name', 'Dishes',
+      'icon', 'plate',
+      'everyDays', 2,
+      'nextDue', '2026-10-13',
+      'assignMode', 'rotation',
+      'assigneeId', tests.recall('rae_member'),
+      'rotationIds', jsonb_build_array(
+        tests.recall('rae_member'), tests.recall('dev_member')
+      ),
+      'rotationIndex', 0,
+      'history', '[]'::jsonb
+    )),
+    3
+  ),
+  4,
+  'the treasurer can create a full rotating chore'
+);
+
+select tests.login_as(tests.recall_uuid('rae'));
+
+select throws_ok(
+  format(
+    $sql$
+      select public.update_group_docs(
+        %L,
+        '[]'::jsonb,
+        jsonb_build_array(jsonb_build_object(
+          'id', 'assigned',
+          'name', 'Dishes',
+          'icon', 'plate',
+          'everyDays', 7,
+          'nextDue', '2026-10-13',
+          'assignMode', 'rotation',
+          'assigneeId', %L,
+          'rotationIds', jsonb_build_array(%L),
+          'rotationIndex', 0,
+          'history', '[]'::jsonb
+        )),
+        4
+      )
+    $sql$,
+    tests.recall('group'),
+    tests.recall('rae_member'),
+    tests.recall('rae_member')
+  ),
+  'Only the treasurer can edit chores',
+  'a member cannot change a chore frequency or rotation'
+);
+
+select is(
+  public.update_group_docs(
+    tests.recall_uuid('group'),
+    '[]'::jsonb,
+    jsonb_build_array(jsonb_build_object(
+      'id', 'assigned',
+      'name', 'Dishes',
+      'icon', 'plate',
+      'everyDays', 2,
+      'nextDue', '2026-10-15',
+      'assignMode', 'rotation',
+      'assigneeId', tests.recall('dev_member'),
+      'rotationIds', jsonb_build_array(
+        tests.recall('rae_member'), tests.recall('dev_member')
+      ),
+      'rotationIndex', 1,
+      'history', jsonb_build_array(jsonb_build_object(
+        'date', '2026-10-13',
+        'assigneeId', tests.recall('rae_member'),
+        'completedAt', '2026-10-13T12:00:00.000Z'
+      ))
+    )),
+    4
+  ),
+  5,
+  'the assigned member can still complete a chore'
+);
+
+select tests.login_as(tests.recall_uuid('dev'));
+
+select is(
+  public.update_group_docs(
+    tests.recall_uuid('group'),
+    '[]'::jsonb,
+    jsonb_build_array(
+      jsonb_set(
+        jsonb_set(
+          (select chores -> 0 from public.groups where id = tests.recall_uuid('group')),
+          '{everyDays}',
+          '4'::jsonb
+        ),
+        '{smartRotation}',
+        'true'::jsonb
+      ),
+      jsonb_build_object(
+        'id', 'custom',
+        'name', 'Custom rotation',
+        'icon', 'custom',
+        'everyDays', 3,
+        'nextDue', '2026-10-15',
+        'assignMode', 'rotation',
+        'smartRotation', false,
+        'assigneeId', tests.recall('dev_member'),
+        'rotationIds', jsonb_build_array(tests.recall('dev_member')),
+        'rotationIndex', 0,
+        'history', '[]'::jsonb
+      )
+    ),
+    5
+  ),
+  6,
+  'the treasurer can edit an existing chore schedule'
+);
+
+select tests.login_as(tests.recall_uuid('newcomer'));
+select public.join_group(tests.recall('code'), 'Newcomer', '@newcomer');
+
+select tests.logout();
+select tests.remember('newcomer_member', (
+  select id::text from public.group_members
+  where group_id = tests.recall_uuid('group')
+    and user_id = tests.recall_uuid('newcomer')
+));
+
+select ok(
+  (select chores -> 0 -> 'rotationIds' from public.groups
+   where id = tests.recall_uuid('group'))
+    @> jsonb_build_array(tests.recall('newcomer_member')),
+  'joining the group adds the new roommate to a smart rotation'
+);
+
+select ok(
+  not (
+    (select chores -> 1 -> 'rotationIds' from public.groups
+     where id = tests.recall_uuid('group'))
+      @> jsonb_build_array(tests.recall('newcomer_member'))
+  ),
+  'joining the group leaves a custom rotation alone'
+);
+
+select is(
+  (select docs_version from public.groups where id = tests.recall_uuid('group')),
+  7,
+  'automatic enrollment advances the chore document version'
 );
 
 select tests.login_as(tests.recall_uuid('outsider'));

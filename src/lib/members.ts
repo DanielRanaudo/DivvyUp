@@ -32,6 +32,23 @@ export interface RemovalCheck {
   balance: number;
 }
 
+/**
+ * Hands the role to an existing member as one atomic local state transition.
+ * Rent and utility charges use this flag to decide who fronted the household
+ * total, so changing it also moves those open balances to the new treasurer.
+ */
+export function transferTreasurerRole(group: Group, memberId: string): Group {
+  if (!group.members.some((member) => member.id === memberId)) return group;
+
+  return {
+    ...group,
+    members: group.members.map((member) => ({
+      ...member,
+      isTreasurer: member.id === memberId,
+    })),
+  };
+}
+
 /** A member's net position: positive means the group owes them. */
 export function memberBalance(
   group: Group,

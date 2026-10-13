@@ -255,6 +255,15 @@ test("closing the month files it away but keeps the debt", async ({ page }) => {
 
 test("the treasurer can hand the role to someone else", async ({ page }) => {
   await createGroup(page, "Handover House");
+
+  // Open household charges belong to the role, not permanently to whoever
+  // happened to create them.
+  await openTab(page, "Rent");
+  await page.getByLabel("Total Monthly Rent").fill("6000");
+  await page.getByRole("button", { name: "Save Rent" }).click();
+  await openTab(page, "Home");
+  await expect(page.getByText("+$5,400.00", { exact: true })).toBeVisible();
+
   await openTab(page, "Group");
 
   await page.getByRole("button", { name: "Make Jordan treasurer" }).click();
@@ -266,8 +275,13 @@ test("the treasurer can hand the role to someone else", async ({ page }) => {
 
   // You keep your place in the house, but not the powers that came with it.
   await expect(tabs(page).getByRole("button", { name: "Rent" })).toHaveCount(0);
+  await openTab(page, "Home");
+  await expect(page.getByText("−$600.00", { exact: true })).toBeVisible();
+
   await viewAs(page, "Jordan (Treasurer)");
   await expect(tabs(page).getByRole("button", { name: "Rent" })).toBeVisible();
+  await openTab(page, "Home");
+  await expect(page.getByText("+$5,400.00", { exact: true })).toBeVisible();
 });
 
 test("a new group has an invite code to share", async ({ page }) => {
@@ -386,6 +400,7 @@ test("chores complete once and rotate through roommates in order", async ({
   await page.getByLabel("Every (days)").fill("1");
   await page.getByLabel("First due").fill(localDateISO(-1));
   await page.getByRole("button", { name: "Rotate", exact: true }).click();
+  await page.getByRole("switch", { name: "Smart rotation" }).click();
   const rotation = page.getByRole("group", { name: /Rotate between/ });
   await rotation.getByRole("button").filter({ hasText: "Alex" }).click();
   await rotation.getByRole("button").filter({ hasText: "Jordan" }).click();
@@ -409,15 +424,52 @@ test("chores complete once and rotate through roommates in order", async ({
   await expect(page.getByText(/Yours tomorrow ·/)).toBeVisible();
 });
 
-test("only the treasurer can delete a chore", async ({ page }) => {
+test("smart rotations spread new chore starts across roommates", async ({
+  page,
+}) => {
+  await createGroup(page, "Smart Chore House");
+  await openTab(page, "Chores");
+
+  for (const name of ["Sweep kitchen", "Mop kitchen"]) {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Name").fill(name);
+    await page.getByRole("button", { name: "Rotate", exact: true }).click();
+    await expect(
+      page.getByRole("switch", { name: "Smart rotation" })
+    ).toBeChecked();
+    await expect(page.getByText("Everyone (10 roommates)")).toBeVisible();
+    await page.getByRole("button", { name: "Add Chore" }).click();
+  }
+
+  // The furnished house already has one rotation starting with You, so these
+  // two begin with the next two least-loaded roommates.
+  await expect(
+    page.getByText("Smart · 10-person rotation · starts with Alex")
+  ).toBeVisible();
+  await expect(
+    page.getByText("Smart · 10-person rotation · starts with Jordan")
+  ).toBeVisible();
+});
+
+test("only the treasurer can edit or delete a chore", async ({ page }) => {
   await createGroup(page, "Chore Permissions House");
   await openTab(page, "Chores");
+
+  await page.getByRole("button", { name: "Edit Take out trash" }).click();
+  await page.getByLabel("Every (days)").fill("4");
+  const rotation = page.getByRole("group", { name: /Rotate between/ });
+  await rotation.getByRole("button").filter({ hasText: "Jordan" }).click();
+  await page.getByRole("button", { name: "Save Changes" }).click();
+  await expect(page.getByText("Every 4 days · 2-person rotation")).toBeVisible();
 
   await expect(
     page.getByRole("button", { name: "Delete Take out trash" })
   ).toBeVisible();
 
   await viewAs(page, "Jordan");
+  await expect(
+    page.getByRole("button", { name: "Edit Take out trash" })
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Delete Take out trash" })
   ).toHaveCount(0);

@@ -3,6 +3,8 @@ import {
   todayISO,
   addDaysISO,
   completeChore,
+  balanceSmartRotationStart,
+  addMemberToSmartRotations,
   isChoreComplete,
   nextAssigneeId,
   choreStatus,
@@ -24,6 +26,82 @@ const baseChore = (overrides: Partial<Chore> = {}): Chore => ({
   rotationIndex: 0,
   history: [],
   ...overrides,
+});
+
+describe("smart rotations", () => {
+  it("balances the first turn across a batch of new chores", () => {
+    const first = balanceSmartRotationStart(
+      baseChore({
+        id: "first",
+        assignMode: "rotation",
+        smartRotation: true,
+        rotationIds: ["a", "b", "c"],
+      }),
+      []
+    );
+    const second = balanceSmartRotationStart(
+      baseChore({
+        id: "second",
+        assignMode: "rotation",
+        smartRotation: true,
+        rotationIds: ["a", "b", "c"],
+      }),
+      [first]
+    );
+    const third = balanceSmartRotationStart(
+      baseChore({
+        id: "third",
+        assignMode: "rotation",
+        smartRotation: true,
+        rotationIds: ["a", "b", "c"],
+      }),
+      [first, second]
+    );
+
+    expect([first.assigneeId, second.assigneeId, third.assigneeId]).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect([first.rotationIndex, second.rotationIndex, third.rotationIndex]).toEqual([
+      0,
+      1,
+      2,
+    ]);
+  });
+
+  it("adds a newcomer only to smart rotations", () => {
+    const smart = baseChore({
+      id: "smart",
+      assignMode: "rotation",
+      smartRotation: true,
+      rotationIds: ["a", "b"],
+    });
+    const custom = baseChore({
+      id: "custom",
+      assignMode: "rotation",
+      smartRotation: false,
+      rotationIds: ["a", "b"],
+    });
+
+    const [nextSmart, nextCustom] = addMemberToSmartRotations(
+      [smart, custom],
+      "c"
+    );
+    expect(nextSmart.rotationIds).toEqual(["a", "b", "c"]);
+    expect(nextSmart.assigneeId).toBe("a");
+    expect(nextSmart.rotationIndex).toBe(0);
+    expect(nextCustom).toBe(custom);
+  });
+
+  it("does not add the same roommate twice", () => {
+    const chore = baseChore({
+      assignMode: "rotation",
+      smartRotation: true,
+      rotationIds: ["a", "b"],
+    });
+    expect(addMemberToSmartRotations([chore], "b")[0]).toBe(chore);
+  });
 });
 
 describe("addDaysISO", () => {

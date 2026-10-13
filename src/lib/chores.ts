@@ -2,6 +2,63 @@ import type { Chore } from "@/lib/types";
 
 export type ChoreStatus = "overdue" | "today" | "upcoming";
 
+/**
+ * Chooses the least-loaded first assignee for a newly-created smart rotation.
+ * Repeated additions therefore start with different roommates instead of all
+ * landing on the first person in the member list.
+ */
+export function balanceSmartRotationStart(
+  chore: Chore,
+  existingChores: Chore[]
+): Chore {
+  if (
+    chore.assignMode !== "rotation" ||
+    !chore.smartRotation ||
+    chore.rotationIds.length === 0
+  ) {
+    return chore;
+  }
+
+  const counts = new Map(chore.rotationIds.map((id) => [id, 0]));
+  existingChores
+    .filter(
+      (existing) =>
+        existing.assignMode === "rotation" && !isChoreComplete(existing)
+    )
+    .forEach((existing) => {
+      if (counts.has(existing.assigneeId)) {
+        counts.set(
+          existing.assigneeId,
+          (counts.get(existing.assigneeId) ?? 0) + 1
+        );
+      }
+    });
+
+  const assigneeId = chore.rotationIds.reduce((best, candidate) =>
+    (counts.get(candidate) ?? 0) < (counts.get(best) ?? 0) ? candidate : best
+  );
+
+  return {
+    ...chore,
+    assigneeId,
+    rotationIndex: chore.rotationIds.indexOf(assigneeId),
+  };
+}
+
+/** Adds a new roommate to every smart rotation without disturbing whose turn it is. */
+export function addMemberToSmartRotations(
+  chores: Chore[],
+  memberId: string
+): Chore[] {
+  return chores.map((chore) =>
+    chore.assignMode === "rotation" &&
+    chore.smartRotation &&
+    !chore.rotationIds.includes(memberId)
+      ? { ...chore, rotationIds: [...chore.rotationIds, memberId] }
+      : chore
+  );
+}
+
 /** A one-off chore is closed once its only scheduled occurrence is logged. */
 export function isChoreComplete(chore: Chore): boolean {
   return (
