@@ -17,9 +17,7 @@ interface ChoreRowProps {
   chore: Chore;
   members: Roster;
   currentUserId: string;
-  canDelete: boolean;
   onDone: (choreId: string) => void;
-  onDelete: (chore: Chore) => void;
 }
 
 /** One chore on the board: whose it is, when it's due, and how to close it. */
@@ -27,9 +25,7 @@ export default function ChoreRow({
   chore,
   members,
   currentUserId,
-  canDelete,
   onDone,
-  onDelete,
 }: ChoreRowProps) {
   const assignee = members.byId(chore.assigneeId);
   const mine = chore.assigneeId === currentUserId;
@@ -125,22 +121,6 @@ export default function ChoreRow({
       >
         Done
       </button>
-      {canDelete && (
-        <button
-          onClick={() => onDelete(chore)}
-          aria-label={`Delete ${chore.name}`}
-          style={{
-            background: "none",
-            border: "none",
-            color: T.tertiary,
-            cursor: "pointer",
-            fontSize: 18,
-            padding: "0 4px",
-          }}
-        >
-          ×
-        </button>
-      )}
     </div>
   );
 }

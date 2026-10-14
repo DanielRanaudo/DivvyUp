@@ -67,9 +67,14 @@ export default function ChoresTab({
       prev.map((c) => (c.id === choreId ? completeChore(c) : c))
     );
 
-  const removal = usePendingDelete<Chore>((chore) =>
-    editChores((prev) => prev.filter((c) => c.id !== chore.id))
-  );
+  const removal = usePendingDelete<Chore>((chore) => {
+    editChores((prev) => prev.filter((c) => c.id !== chore.id));
+    setForm((current) =>
+      current.kind === "edit" && current.id === chore.id
+        ? { kind: "closed" }
+        : current
+    );
+  });
 
   const today = todayISO();
   // "Today" is the shared board: every chore due today or overdue, so the
@@ -188,23 +193,42 @@ export default function ChoresTab({
                         : members.nameOf(chore.assigneeId)}
                     </div>
                   </div>
-                  <button
-                    onClick={() => setForm({ kind: "edit", id: chore.id })}
-                    aria-label={`Edit ${chore.name}`}
-                    style={{
-                      background: "none",
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 8,
-                      padding: "5px 12px",
-                      color: T.blue,
-                      fontFamily: T.font,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Edit
-                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => setForm({ kind: "edit", id: chore.id })}
+                      aria-label={`Edit ${chore.name}`}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 8,
+                        padding: "5px 12px",
+                        color: T.blue,
+                        fontFamily: T.font,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => removal.ask(chore)}
+                      aria-label={`Delete ${chore.name}`}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 8,
+                        padding: "5px 12px",
+                        color: T.red,
+                        fontFamily: T.font,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
           </div>
@@ -247,9 +271,7 @@ export default function ChoresTab({
                         chore={chore}
                         members={members}
                         currentUserId={currentUser.id}
-                        canDelete={isTreasurer}
                         onDone={markDone}
-                        onDelete={removal.ask}
                       />
                     </div>
                   ))}

@@ -455,6 +455,15 @@ test("only the treasurer can edit or delete a chore", async ({ page }) => {
   await createGroup(page, "Chore Permissions House");
   await openTab(page, "Chores");
 
+  // Future chores can be deleted from schedule management too; deletion is
+  // not limited to chores that happen to be due today.
+  await page.getByRole("button", { name: "Delete Wash the dishes" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page.getByText("Wash the dishes")).toHaveCount(0);
+
   await page.getByRole("button", { name: "Edit Take out trash" }).click();
   await page.getByLabel("Every (days)").fill("4");
   const rotation = page.getByRole("group", { name: /Rotate between/ });
