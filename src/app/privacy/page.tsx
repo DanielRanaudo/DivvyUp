@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy" updated="27 July 2026">
+    <LegalPage title="Privacy" updated="15 October 2026">
       <p>
         DivvyUp is a tool for splitting household costs between roommates. It
         stores the minimum needed to do that, and nothing is sold or shared with
@@ -35,6 +35,11 @@ export default function PrivacyPage() {
             expenses, chores, and payments, along with any receipt images you
             attach.
           </li>
+          <li>
+            <strong>A calendar subscription token</strong>, if you enable the
+            optional chore calendar. DivvyUp stores only a one-way hash of that
+            token, not the private link itself.
+          </li>
         </ul>
       </Section>
 
@@ -49,6 +54,12 @@ export default function PrivacyPage() {
           Receipt images are stored privately. Viewing one requires a link that
           is generated on request, expires after an hour, and is only issued to
           current members of the group the receipt belongs to.
+        </p>
+        <p>
+          If you enable the chore calendar, anyone holding its private link can
+          read the names and dates of chores assigned to you. The link does not
+          expose your account, payments, or chores assigned only to somebody
+          else. You can replace or disable it from your profile at any time.
         </p>
       </Section>
 
@@ -68,6 +79,12 @@ export default function PrivacyPage() {
           through an email provider. There is no advertising or analytics
           tracking in DivvyUp.
         </p>
+        <p>
+          If you choose to subscribe through Google Calendar, Apple Calendar,
+          Outlook, or another calendar provider, that provider periodically
+          retrieves your filtered chore feed. DivvyUp does not receive access
+          to your calendar account.
+        </p>
       </Section>
 
       <Section heading="How long it is kept">
@@ -85,7 +102,8 @@ export default function PrivacyPage() {
           You can change or clear your name, payment handles, and profile
           picture at any time from your profile, leave any group, and request
           deletion of your account. Venmo and Zelle details are optional; the
-          app works without them.
+          app works without them. The chore calendar is also optional and can
+          be disabled independently.
         </p>
       </Section>
 

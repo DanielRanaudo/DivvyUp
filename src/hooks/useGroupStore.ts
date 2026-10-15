@@ -307,7 +307,9 @@ export function useGroupStore({
     async (groupName: string): Promise<string | null> => {
       if (USE_BACKEND && supabase && session) {
         try {
-          const gid = await createGroupOnServer(supabase, groupName);
+          const timezone =
+            Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+          const gid = await createGroupOnServer(supabase, groupName, timezone);
           const loaded = await fetchGroup(supabase, gid, session.user.id);
           if (loaded) enterLoadedGroup(loaded.group, loaded.myMemberId);
           return null;

@@ -101,10 +101,22 @@ export interface Subgroup {
   bills: SubgroupBill[];
 }
 
+export type ChoreHistoryOutcome =
+  | "completed"
+  | "not_confirmed"
+  | "reported_later"
+  | "excused";
+
 export interface ChoreCompletion {
   date: string;
   assigneeId: string;
-  completedAt: string;
+  /** Missing on legacy entries, where it implicitly means "completed". */
+  outcome?: ChoreHistoryOutcome;
+  completedAt?: string;
+  /** When the server closed an unconfirmed occurrence. */
+  recordedAt?: string;
+  /** When a treasurer excused an occurrence. */
+  resolvedAt?: string;
 }
 
 export interface Chore {
@@ -147,6 +159,8 @@ export interface Group {
   id: string;
   name: string;
   code: string;
+  /** IANA timezone used to decide when a new chore occurrence starts. */
+  timezone?: string;
   members: Member[];
   rent: RentConfig | null;
   utilities: Utility[];

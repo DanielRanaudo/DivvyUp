@@ -8,12 +8,16 @@ import {
   addDaysISO,
   completeChore,
   balanceSmartRotationStart,
+  excuseChoreOccurrence,
   isChoreComplete,
   projectOccurrences,
+  reportChoreDoneLater,
+  rollOverChore,
 } from "@/lib/chores";
 import type { Group, Member, Chore } from "@/lib/types";
 import ChoreCalendar from "@/components/ChoreCalendar";
 import ChoreForm from "@/components/chores/ChoreForm";
+import ChoreHistory from "@/components/chores/ChoreHistory";
 import ChoreRow, { UpcomingChoreRow } from "@/components/chores/ChoreRow";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePendingDelete } from "@/hooks/usePendingDelete";
@@ -48,16 +52,18 @@ export default function ChoresTab({
     setGroup((prev) => ({ ...prev, chores: change(prev.chores ?? []) }));
 
   const addChore = (chore: Chore) => {
-    editChores((prev) => [
-      ...prev,
-      balanceSmartRotationStart(chore, prev),
-    ]);
+    editChores((prev) => {
+      const balanced = balanceSmartRotationStart(chore, prev);
+      return [...prev, rollOverChore(balanced, todayISO())];
+    });
     setForm({ kind: "closed" });
   };
 
   const saveChore = (chore: Chore) => {
     editChores((prev) =>
-      prev.map((existing) => (existing.id === chore.id ? chore : existing))
+      prev.map((existing) =>
+        existing.id === chore.id ? rollOverChore(chore, todayISO()) : existing
+      )
     );
     setForm({ kind: "closed" });
   };
@@ -65,6 +71,32 @@ export default function ChoresTab({
   const markDone = (choreId: string) =>
     editChores((prev) =>
       prev.map((c) => (c.id === choreId ? completeChore(c) : c))
+    );
+
+  const reportLater = (
+    choreId: string,
+    date: string,
+    assigneeId: string
+  ) =>
+    editChores((prev) =>
+      prev.map((chore) =>
+        chore.id === choreId
+          ? reportChoreDoneLater(chore, date, assigneeId)
+          : chore
+      )
+    );
+
+  const excuseOccurrence = (
+    choreId: string,
+    date: string,
+    assigneeId: string
+  ) =>
+    editChores((prev) =>
+      prev.map((chore) =>
+        chore.id === choreId
+          ? excuseChoreOccurrence(chore, date, assigneeId)
+          : chore
+      )
     );
 
   const removal = usePendingDelete<Chore>((chore) => {
@@ -249,64 +281,77 @@ export default function ChoresTab({
       )}
 
       {chores.length > 0 && (
-        <div className="chores-grid">
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div>
-              <DayLabel color={T.blue}>Today</DayLabel>
-              {dueToday.length === 0 ? (
-                <Empty>Nothing due today</Empty>
-              ) : (
-                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-                  {dueToday.map((chore, i) => (
-                    <div
-                      key={chore.id}
-                      style={{
-                        borderBottom:
-                          i < dueToday.length - 1
-                            ? `1px solid ${T.border}`
-                            : "none",
-                      }}
-                    >
-                      <ChoreRow
-                        chore={chore}
-                        members={members}
-                        currentUserId={currentUser.id}
-                        onDone={markDone}
+        <>
+          <div className="chores-grid">
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <DayLabel color={T.blue}>Today</DayLabel>
+                {dueToday.length === 0 ? (
+                  <Empty>Nothing due today</Empty>
+                ) : (
+                  <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                    {dueToday.map((chore, i) => (
+                      <div
+                        key={chore.id}
+                        style={{
+                          borderBottom:
+                            i < dueToday.length - 1
+                              ? `1px solid ${T.border}`
+                              : "none",
+                        }}
+                      >
+                        <ChoreRow
+                          chore={chore}
+                          members={members}
+                          currentUserId={currentUser.id}
+                          onDone={markDone}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <DayLabel color={T.secondary}>
+                  Tomorrow · your chores
+                </DayLabel>
+                {mineTomorrow.length === 0 ? (
+                  <Empty>No chores assigned to you tomorrow</Empty>
+                ) : (
+                  <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+                    {mineTomorrow.map((occ, i) => (
+                      <UpcomingChoreRow
+                        key={occ.choreId}
+                        icon={occ.icon}
+                        name={occ.name}
+                        date={occ.date}
+                        last={i === mineTomorrow.length - 1}
                       />
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div>
-              <DayLabel color={T.secondary}>Tomorrow · your chores</DayLabel>
-              {mineTomorrow.length === 0 ? (
-                <Empty>No chores assigned to you tomorrow</Empty>
-              ) : (
-                <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-                  {mineTomorrow.map((occ, i) => (
-                    <UpcomingChoreRow
-                      key={occ.choreId}
-                      icon={occ.icon}
-                      name={occ.name}
-                      date={occ.date}
-                      last={i === mineTomorrow.length - 1}
-                    />
-                  ))}
-                </div>
-              )}
+            <div style={cardStyle}>
+              <ChoreCalendar
+                chores={chores}
+                members={group.members}
+                currentUser={currentUser}
+              />
             </div>
           </div>
 
-          <div style={cardStyle}>
-            <ChoreCalendar
-              chores={chores}
-              members={group.members}
-              currentUser={currentUser}
-            />
-          </div>
-        </div>
+          <ChoreHistory
+            chores={chores}
+            members={members}
+            currentUserId={currentUser.id}
+            isTreasurer={isTreasurer}
+            onReportLater={reportLater}
+            onExcuse={excuseOccurrence}
+          />
+        </>
       )}
 
       <ConfirmDialog

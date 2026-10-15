@@ -5,6 +5,7 @@ import { T } from "@/lib/tokens";
 import type { ProfileEdits, ProfileSaveResult } from "@/lib/types";
 import ProfileCard from "@/components/profile/ProfileCard";
 import GroupList, { type ProfileGroup } from "@/components/profile/GroupList";
+import CalendarFeedCard from "@/components/profile/CalendarFeedCard";
 import { sectionLabel } from "@/components/profile/styles";
 
 export type { ProfileGroup };
@@ -17,6 +18,8 @@ interface ProfileScreenProps {
   avatarUrl?: string;
   /** Email changes need an auth backend, so they're hidden in sandbox mode. */
   canEditEmail: boolean;
+  /** Private calendar feeds need a signed-in backend account. */
+  calendarFeedAvailable: boolean;
   groups: ProfileGroup[];
   activeGroupId: string | null;
   onBack: () => void;
@@ -36,6 +39,7 @@ export default function ProfileScreen({
   zelle,
   avatarUrl,
   canEditEmail,
+  calendarFeedAvailable,
   groups,
   activeGroupId,
   onBack,
@@ -140,6 +144,13 @@ export default function ProfileScreen({
         <GroupAction label="Start a group" onClick={onCreateGroup} />
         <GroupAction label="Join a group" onClick={onJoinGroup} />
       </div>
+
+      {calendarFeedAvailable && (
+        <>
+          <div style={sectionLabel}>Calendar</div>
+          <CalendarFeedCard />
+        </>
+      )}
 
       {onLogout && (
         <>

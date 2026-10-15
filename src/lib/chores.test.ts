@@ -5,8 +5,12 @@ import {
   completeChore,
   balanceSmartRotationStart,
   addMemberToSmartRotations,
+  choreHistoryOutcome,
+  excuseChoreOccurrence,
   isChoreComplete,
   nextAssigneeId,
+  reportChoreDoneLater,
+  rollOverChore,
   choreStatus,
   groupChores,
   myOpenChoreCount,
@@ -214,6 +218,176 @@ describe("completeChore", () => {
     const done = completeChore(chore);
     expect(done.assigneeId).toBe("a");
     expect(done.nextDue).toBe("2026-07-08");
+  });
+});
+
+describe("automatic rollover", () => {
+  it("keeps an occurrence open until its next scheduled boundary", () => {
+    const chore = baseChore({ nextDue: "2026-07-06", everyDays: 3 });
+
+    expect(
+      rollOverChore(chore, "2026-07-08", "2026-07-08T12:00:00.000Z")
+    ).toBe(chore);
+
+    const rolled = rollOverChore(
+      chore,
+      "2026-07-09",
+      "2026-07-09T12:00:00.000Z"
+    );
+    expect(rolled.nextDue).toBe("2026-07-09");
+    expect(rolled.history).toEqual([
+      {
+        date: "2026-07-06",
+        assigneeId: "a",
+        outcome: "not_confirmed",
+        recordedAt: "2026-07-09T12:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("catches up every elapsed rotating occurrence in order", () => {
+    const chore = baseChore({
+      nextDue: "2026-07-01",
+      everyDays: 2,
+      assignMode: "rotation",
+      rotationIds: ["a", "b", "c"],
+      rotationIndex: 0,
+      assigneeId: "a",
+    });
+
+    const rolled = rollOverChore(
+      chore,
+      "2026-07-07",
+      "2026-07-07T08:00:00.000Z"
+    );
+    expect(rolled.nextDue).toBe("2026-07-07");
+    expect(rolled.assigneeId).toBe("a");
+    expect(rolled.rotationIndex).toBe(0);
+    expect(rolled.history.map((entry) => entry.date)).toEqual([
+      "2026-07-01",
+      "2026-07-03",
+      "2026-07-05",
+    ]);
+    expect(rolled.history.map((entry) => entry.assigneeId)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect(
+      rolled.history.every((entry) => entry.outcome === "not_confirmed")
+    ).toBe(true);
+  });
+
+  it("uses the saved assignee when the rotation index is stale", () => {
+    const chore = baseChore({
+      nextDue: "2026-07-01",
+      assignMode: "rotation",
+      rotationIds: ["a", "b", "c"],
+      rotationIndex: 0,
+      assigneeId: "b",
+    });
+
+    const rolled = rollOverChore(chore, "2026-07-03");
+    expect(rolled.history[0].assigneeId).toBe("b");
+    expect(rolled.assigneeId).toBe("c");
+    expect(rolled.rotationIndex).toBe(2);
+  });
+
+  it("does not rotate fixed chores or automatically close one-offs", () => {
+    const fixed = baseChore({ nextDue: "2026-07-01", everyDays: 2 });
+    const rolled = rollOverChore(fixed, "2026-07-05");
+    expect(rolled.nextDue).toBe("2026-07-05");
+    expect(rolled.assigneeId).toBe("a");
+    expect(rolled.history).toHaveLength(2);
+
+    const oneOff = baseChore({ nextDue: "2026-01-01", everyDays: 0 });
+    expect(rollOverChore(oneOff, "2026-07-05")).toBe(oneOff);
+  });
+
+  it("is idempotent after the saved schedule has caught up", () => {
+    const first = rollOverChore(
+      baseChore({ nextDue: "2026-07-01", everyDays: 2 }),
+      "2026-07-05",
+      "2026-07-05T08:00:00.000Z"
+    );
+    const second = rollOverChore(
+      first,
+      "2026-07-05",
+      "2026-07-05T09:00:00.000Z"
+    );
+
+    expect(second).toBe(first);
+    expect(second.history).toHaveLength(2);
+  });
+});
+
+describe("chore history corrections", () => {
+  const missed = baseChore({
+    history: [
+      {
+        date: "2026-07-01",
+        assigneeId: "a",
+        outcome: "not_confirmed",
+        recordedAt: "2026-07-03T08:00:00.000Z",
+      },
+    ],
+  });
+
+  it("lets the original assignee report completion without moving the schedule", () => {
+    const reported = reportChoreDoneLater(
+      missed,
+      "2026-07-01",
+      "a",
+      "2026-07-04T10:00:00.000Z"
+    );
+
+    expect(reported.nextDue).toBe(missed.nextDue);
+    expect(reported.assigneeId).toBe(missed.assigneeId);
+    expect(reported.history[0]).toEqual({
+      ...missed.history[0],
+      outcome: "reported_later",
+      completedAt: "2026-07-04T10:00:00.000Z",
+    });
+    expect(missed.history[0].outcome).toBe("not_confirmed");
+  });
+
+  it("does not let another roommate claim an occurrence", () => {
+    expect(reportChoreDoneLater(missed, "2026-07-01", "b")).toBe(missed);
+  });
+
+  it("excuses only the selected unconfirmed occurrence", () => {
+    const excused = excuseChoreOccurrence(
+      missed,
+      "2026-07-01",
+      "a",
+      "2026-07-04T11:00:00.000Z"
+    );
+    expect(excused.history[0]).toEqual({
+      ...missed.history[0],
+      outcome: "excused",
+      resolvedAt: "2026-07-04T11:00:00.000Z",
+    });
+    expect(excused.nextDue).toBe(missed.nextDue);
+  });
+
+  it("treats legacy history as completed and not-confirmed as still open", () => {
+    expect(
+      choreHistoryOutcome({ date: "2026-07-01", assigneeId: "a" })
+    ).toBe("completed");
+    expect(
+      isChoreComplete(
+        baseChore({
+          everyDays: 0,
+          history: [
+            {
+              date: todayISO(),
+              assigneeId: "a",
+              outcome: "not_confirmed",
+            },
+          ],
+        })
+      )
+    ).toBe(false);
   });
 });
 

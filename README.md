@@ -67,10 +67,12 @@ compressed carry-forward ledger and browsable archive · CSV export · Venmo/Zel
 handles surfaced next to what you owe.
 
 **Household** — chores with fixed or round-robin assignment, repeat intervals,
-and a projected calendar · dashboard of your balance, what's due, and what's
-waiting on you · multi-group membership by invite code · treasurer role that can
-be handed off · member removal that blocks on open balances and re-splits rent ·
-daily digest emails · profiles mirrored across every group you're in.
+and a projected calendar · private iCalendar subscriptions filtered to each
+roommate's assignments (Google Calendar, Apple Calendar, Outlook) · dashboard of
+your balance, what's due, and what's waiting on you · multi-group membership by
+invite code · treasurer role that can be handed off · member removal that blocks
+on open balances and re-splits rent · daily digest emails · profiles mirrored
+across every group you're in.
 
 **Product** — installable mobile-first PWA · realtime sync · optimistic UI with
 rollback · backend-free demo mode with a user switcher · accessibility (focus
@@ -104,9 +106,9 @@ one now has a test proving it stays closed.
 
 | Layer | Tool | Covers |
 |---|---|---|
-| **226 unit tests** (16 files) | Vitest | Money logic — splits, settlements, chore rotation, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
+| **243 unit tests** (17 files) | Vitest | Money logic — splits, settlements, chore rotation and calendar feeds, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
 | **14 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
-| **69 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
+| **108 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
 
 All three run in GitHub Actions on every push and PR, alongside lint, typecheck,
 and a production build.
@@ -198,7 +200,7 @@ src/
 ├── context/        # Supabase session provider
 ├── hooks/          # Group store (optimistic writes), realtime, URL routing
 └── lib/            # settlements · splits · charges · periods · members · chores
-                    # · csv · reminders · receipts · api (diff persistence)
+                    # · calendar feeds · csv · reminders · receipts · api
 e2e/                # Playwright smoke tests (sandbox mode)
 supabase/
 ├── migrations/     # Tables, RLS, RPCs, storage, realtime

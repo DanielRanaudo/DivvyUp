@@ -193,6 +193,7 @@ function DivvyUp() {
           zelle={currentUser?.zelle || (authMeta.zelle as string) || ""}
           avatarUrl={currentUser?.avatarUrl}
           canEditEmail={USE_BACKEND}
+          calendarFeedAvailable={USE_BACKEND}
           onSave={store.saveProfile}
           onUploadAvatar={store.uploadProfilePicture}
           groups={groups.map((g) => {

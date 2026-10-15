@@ -73,6 +73,7 @@ export function localGroup(name: string, you: Member): Group {
     id: uid(),
     name,
     code: groupCode(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     members: [you, ...others],
     rent: null,
     utilities: [],

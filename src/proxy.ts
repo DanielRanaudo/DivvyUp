@@ -35,5 +35,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Public calendar subscribers authenticate with an unguessable feed token,
+  // not a Supabase cookie, so avoid an unnecessary auth refresh on that route.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/calendar/).*)"],
 };

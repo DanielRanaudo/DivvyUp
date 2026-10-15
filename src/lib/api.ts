@@ -21,7 +21,7 @@ export interface LoadedGroup {
 }
 
 const GROUP_SELECT = `
-  id, name, code, smart_settle, subgroups, chores, docs_version, created_by,
+  id, name, code, timezone, smart_settle, subgroups, chores, docs_version, created_by,
   group_members ( id, user_id, name, venmo, zelle, avatar_url, is_treasurer ),
   rent ( amount, split_type, recurring, percentages, customs, splits ),
   utilities ( id, name, amount, recurring, splits, date, archived, period ),
@@ -142,6 +142,7 @@ function mapGroup(row: any): Group {
     id: row.id,
     name: row.name,
     code: row.code,
+    timezone: row.timezone ?? "UTC",
     smartSettle: !!row.smart_settle,
     members: (row.group_members ?? []).map(mapMember),
     rent: mapRent(rentRow),
@@ -167,6 +168,11 @@ export async function fetchMyGroups(
   supabase: SupabaseClient,
   myUserId: string
 ): Promise<LoadedGroup[]> {
+  const { error: rolloverError } = await supabase.rpc(
+    "reconcile_my_chore_rotations"
+  );
+  if (rolloverError) throw new Error(rolloverError.message);
+
   const { data, error } = await selectGroups(supabase).order("created_at", {
     ascending: true,
   });
@@ -186,6 +192,12 @@ export async function fetchGroup(
   groupId: string,
   myUserId: string
 ): Promise<LoadedGroup | null> {
+  const { error: rolloverError } = await supabase.rpc(
+    "reconcile_group_chores",
+    { p_group_id: groupId }
+  );
+  if (rolloverError) throw new Error(rolloverError.message);
+
   const { data, error } = await selectGroups(supabase)
     .eq("id", groupId)
     .maybeSingle();
@@ -204,10 +216,12 @@ export async function fetchGroup(
 
 export async function createGroup(
   supabase: SupabaseClient,
-  groupName: string
+  groupName: string,
+  timezone: string
 ): Promise<string> {
   const { data, error } = await supabase.rpc("create_group", {
     p_group_name: groupName,
+    p_timezone: timezone,
   });
   if (error) throw new Error(error.message);
   return data as string;

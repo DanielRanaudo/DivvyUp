@@ -392,9 +392,9 @@ test("chores complete once and rotate through roommates in order", async ({
   ).toHaveCount(0);
   await expect(page.getByLabel(/Clean fridge ·/)).toHaveCount(0);
 
-  // Catching up an overdue rotation records each scheduled occurrence. The
-  // first click moves yesterday's turn from You to Alex for today; Alex's click
-  // then hands tomorrow to Jordan.
+  // A forgotten tap cannot freeze a rotation. Adding yesterday's daily turn
+  // closes it as not confirmed and starts Alex's turn today. You can report
+  // the missed record later without moving Alex's live turn.
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Name").fill("Rotate bins");
   await page.getByLabel("Every (days)").fill("1");
@@ -409,10 +409,17 @@ test("chores complete once and rotate through roommates in order", async ({
   const markBinsDone = page.getByRole("button", {
     name: "Mark Rotate bins done",
   });
-  await expect(page.getByText("then → Alex")).toBeVisible();
-  await markBinsDone.click();
   await expect(markBinsDone).toBeDisabled();
   await expect(page.getByText("then → Jordan")).toBeVisible();
+  await expect(page.getByText("Not confirmed")).toBeVisible();
+  await expect(
+    page.getByLabel(`Excuse Rotate bins for ${localDateISO(-1)}`)
+  ).toBeVisible();
+  await page
+    .getByLabel(`Report Rotate bins done for ${localDateISO(-1)}`)
+    .click();
+  await expect(page.getByText("Reported later")).toBeVisible();
+  await expect(markBinsDone).toBeDisabled();
 
   await viewAs(page, "Alex");
   await expect(markBinsDone).toBeEnabled();

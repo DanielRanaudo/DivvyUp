@@ -57,6 +57,15 @@ e2e smoke test.
 Flexible splits live under **Expenses → Split**, available to the treasurer on
 pending expenses: *Evenly*, *Some of us*, *Amounts*, *Percent*.
 
+**A subscribed chore calendar has not updated yet** — first open its private
+`.ics` URL directly. If it shows the current assignments, DivvyUp is up to date
+and the calendar provider has not refreshed its subscription yet; Google,
+Apple, and Microsoft control that schedule. If the URL returns 404, the feed
+was disabled or its private link was replaced. Create a new link under
+**Profile → Calendar**, remove the old subscribed calendar, and add the new URL.
+DivvyUp cannot force a provider refresh because the subscription is deliberately
+read-only and uses no access to the user's calendar account.
+
 ## CI
 
 **`npm ci` fails with `Missing: @emnapi/core@1.11.1 from lock file`** —

@@ -1,6 +1,19 @@
-import type { Chore } from "@/lib/types";
+import type {
+  Chore,
+  ChoreCompletion,
+  ChoreHistoryOutcome,
+} from "@/lib/types";
 
 export type ChoreStatus = "overdue" | "today" | "upcoming";
+
+const MAX_ROLLOVERS = 10_000;
+
+/** Legacy history rows predate outcomes and always represented completion. */
+export function choreHistoryOutcome(
+  entry: ChoreCompletion
+): ChoreHistoryOutcome {
+  return entry.outcome ?? "completed";
+}
 
 /**
  * Chooses the least-loaded first assignee for a newly-created smart rotation.
@@ -63,7 +76,11 @@ export function addMemberToSmartRotations(
 export function isChoreComplete(chore: Chore): boolean {
   return (
     chore.everyDays <= 0 &&
-    chore.history.some((completion) => completion.date === chore.nextDue)
+    chore.history.some(
+      (entry) =>
+        entry.date === chore.nextDue &&
+        choreHistoryOutcome(entry) !== "not_confirmed"
+    )
   );
 }
 
@@ -110,6 +127,110 @@ export function completeChore(chore: Chore): Chore {
     return { ...chore, history };
   }
 
+  return advanceRecurringChore({ ...chore, history });
+}
+
+/**
+ * Closes every elapsed recurring occurrence that was never confirmed.
+ *
+ * The current occurrence remains open until the following scheduled occurrence
+ * begins. For example, a weekly Monday chore stays overdue during that week and
+ * rolls on the next Monday. One-time chores never roll automatically.
+ */
+export function rollOverChore(
+  chore: Chore,
+  throughDate: string,
+  recordedAt = new Date().toISOString()
+): Chore {
+  if (chore.everyDays <= 0 || !isISODate(throughDate)) return chore;
+
+  let next = chore;
+  let count = 0;
+
+  while (
+    count < MAX_ROLLOVERS &&
+    addDaysISO(next.nextDue, next.everyDays) <= throughDate
+  ) {
+    const unconfirmed: ChoreCompletion = {
+      date: next.nextDue,
+      assigneeId: next.assigneeId,
+      outcome: "not_confirmed",
+      recordedAt,
+    };
+    next = advanceRecurringChore({
+      ...next,
+      history: [...next.history, unconfirmed],
+    });
+    count += 1;
+  }
+
+  if (addDaysISO(next.nextDue, next.everyDays) <= throughDate) {
+    throw new Error("Chore rollover exceeded the safety limit");
+  }
+
+  return next;
+}
+
+/** Rolls a household forward while preserving identities for unchanged chores. */
+export function rollOverChores(
+  chores: Chore[],
+  throughDate: string,
+  recordedAt = new Date().toISOString()
+): Chore[] {
+  return chores.map((chore) =>
+    rollOverChore(chore, throughDate, recordedAt)
+  );
+}
+
+/** Lets the original assignee confirm a closed occurrence without rewinding. */
+export function reportChoreDoneLater(
+  chore: Chore,
+  date: string,
+  memberId: string,
+  completedAt = new Date().toISOString()
+): Chore {
+  const index = chore.history.findLastIndex(
+    (entry) =>
+      entry.date === date &&
+      entry.assigneeId === memberId &&
+      choreHistoryOutcome(entry) === "not_confirmed"
+  );
+  if (index < 0) return chore;
+
+  const history = [...chore.history];
+  history[index] = {
+    ...history[index],
+    outcome: "reported_later",
+    completedAt,
+  };
+  return { ...chore, history };
+}
+
+/** Treasurer correction for an occurrence that should not count either way. */
+export function excuseChoreOccurrence(
+  chore: Chore,
+  date: string,
+  assigneeId: string,
+  resolvedAt = new Date().toISOString()
+): Chore {
+  const index = chore.history.findLastIndex(
+    (entry) =>
+      entry.date === date &&
+      entry.assigneeId === assigneeId &&
+      choreHistoryOutcome(entry) === "not_confirmed"
+  );
+  if (index < 0) return chore;
+
+  const history = [...chore.history];
+  history[index] = {
+    ...history[index],
+    outcome: "excused",
+    resolvedAt,
+  };
+  return { ...chore, history };
+}
+
+function advanceRecurringChore(chore: Chore): Chore {
   const nextDue = addDaysISO(chore.nextDue, chore.everyDays);
 
   if (chore.assignMode === "rotation" && chore.rotationIds.length > 0) {
@@ -117,14 +238,17 @@ export function completeChore(chore: Chore): Chore {
       (currentRotationIndex(chore) + 1) % chore.rotationIds.length;
     return {
       ...chore,
-      history,
       nextDue,
       rotationIndex,
       assigneeId: chore.rotationIds[rotationIndex],
     };
   }
 
-  return { ...chore, history, nextDue };
+  return { ...chore, nextDue };
+}
+
+function isISODate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 /** Returns the assignee id of the occurrence after the current one. */
