@@ -2,7 +2,7 @@
 
 **Shared-expense management for houses too big for a group chat.**
 
-[**Live demo**](https://divvy-ughiy928m-danielranaudos-projects.vercel.app) ·
+[**Live demo**](https://www.divvyup.site) ·
 [Run it locally](#run-it) · [Engineering notes](#engineering-highlights)
 
 [![CI](https://github.com/DanielRanaudo/DivvyUp/actions/workflows/ci.yml/badge.svg)](https://github.com/DanielRanaudo/DivvyUp/actions/workflows/ci.yml)
