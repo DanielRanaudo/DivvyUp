@@ -70,9 +70,9 @@ handles surfaced next to what you owe.
 and a projected calendar · private iCalendar subscriptions filtered to each
 roommate's assignments (Google Calendar, Apple Calendar, Outlook) · dashboard of
 your balance, what's due, and what's waiting on you · multi-group membership by
-invite code · treasurer role that can be handed off · member removal that blocks
-on open balances and re-splits rent · daily digest emails · profiles mirrored
-across every group you're in.
+invite code · owner permissions that survive a treasurer handoff · member
+removal that blocks on open balances and re-splits rent · daily digest emails ·
+profiles mirrored across every group you're in.
 
 **Product** — installable mobile-first PWA · realtime sync · optimistic UI with
 rollback · backend-free demo mode with a user switcher · accessibility (focus
@@ -87,12 +87,14 @@ traps, ARIA live regions, `prefers-reduced-motion`) · deep-linkable URLs.
 The browser talks to Supabase directly, so every authorization decision is
 enforced by row-level security and `SECURITY DEFINER` RPCs:
 
-- Members read only their own groups; rent and bills are treasurer-only writes;
-  payments are confirmable only by the recipient.
+- Members read only their own groups; owners manage chores, members, and group
+  settings; rent and bills remain treasurer-only writes; payments are
+  confirmable only by the recipient.
 - Sensitive transitions are RPCs, validated server-side — `approve_expense`
   re-derives splits and checks they sum to the amount within a cent,
-  `confirm_payment` refuses amount changes mid-confirmation, `transfer_treasurer`
-  is the only path to the role.
+  `confirm_payment` refuses amount changes mid-confirmation, and
+  `transfer_treasurer` is the only path to the role for either the owner or the
+  current treasurer.
 - A column-guard trigger blocks members from editing protected fields on their
   own membership row, `is_treasurer` above all.
 - Invite codes are 10 CSPRNG characters over an unambiguous 32-symbol alphabet,
@@ -108,7 +110,7 @@ one now has a test proving it stays closed.
 |---|---|---|
 | **243 unit tests** (17 files) | Vitest | Money logic — splits, settlements, chore rotation and calendar feeds, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
 | **14 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
-| **108 database assertions** | pgTAP | Authorization from an ordinary member's session: every privilege escalation and concurrent-write attack fails |
+| **132 database assertions** | pgTAP | Owner/treasurer separation, ordinary-member authorization, privilege-escalation defenses, and concurrent-write safety |
 
 All three run in GitHub Actions on every push and PR, alongside lint, typecheck,
 and a production build.

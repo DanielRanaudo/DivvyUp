@@ -273,8 +273,15 @@ test("the treasurer can hand the role to someone else", async ({ page }) => {
     .click();
   await expect(page.getByText("Jordan is now the treasurer")).toBeVisible();
 
-  // You keep your place in the house, but not the powers that came with it.
+  // The owner gives up financial authority but keeps household-management
+  // controls, including chore schedules and the ability to reclaim treasury.
   await expect(tabs(page).getByRole("button", { name: "Rent" })).toHaveCount(0);
+  await openTab(page, "Chores");
+  await expect(page.getByText("Manage schedules")).toBeVisible();
+  await openTab(page, "Group");
+  await expect(
+    page.getByRole("button", { name: "Make You treasurer" })
+  ).toBeVisible();
   await openTab(page, "Home");
   await expect(page.getByText("−$600.00", { exact: true })).toBeVisible();
 
@@ -458,7 +465,7 @@ test("smart rotations spread new chore starts across roommates", async ({
   ).toBeVisible();
 });
 
-test("only the treasurer can edit or delete a chore", async ({ page }) => {
+test("only a group manager can edit or delete a chore", async ({ page }) => {
   await createGroup(page, "Chore Permissions House");
   await openTab(page, "Chores");
 

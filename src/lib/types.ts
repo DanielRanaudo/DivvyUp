@@ -1,5 +1,7 @@
 export interface Member {
   id: string;
+  /** Auth account id. Present for backend memberships. */
+  userId?: string;
   name: string;
   venmo: string;
   /** Zelle contact — a phone number. */
@@ -157,6 +159,8 @@ export interface PeriodTotals {
 
 export interface Group {
   id: string;
+  /** Auth account that created the group and retains owner permissions. */
+  createdBy?: string;
   name: string;
   code: string;
   /** IANA timezone used to decide when a new chore occurrence starts. */

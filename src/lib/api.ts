@@ -56,6 +56,7 @@ function selectGroups(supabase: SupabaseClient) {
 function mapMember(r: any): Member {
   return {
     id: r.id,
+    userId: r.user_id,
     name: r.name,
     venmo: r.venmo ?? "",
     zelle: r.zelle ?? "",
@@ -140,6 +141,7 @@ function mapGroup(row: any): Group {
   const rentRow = Array.isArray(row.rent) ? row.rent[0] : row.rent;
   return {
     id: row.id,
+    createdBy: row.created_by,
     name: row.name,
     code: row.code,
     timezone: row.timezone ?? "UTC",
@@ -250,7 +252,7 @@ export async function joinGroup(
   return data as string;
 }
 
-/** Hands the treasurer role to another member. Current treasurer only. */
+/** Hands the treasurer role to another member. Owner or current treasurer. */
 export async function transferTreasurer(
   supabase: SupabaseClient,
   groupId: string,
@@ -577,7 +579,7 @@ export function buildGroupOps(
   const gid = next.id;
   const ops: WriteOp[] = [];
 
-  // --- groups row: treasurer-only scalars via direct update ---
+  // --- groups row: owner/treasurer settings via direct update ---
   if (prev.name !== next.name || prev.smartSettle !== next.smartSettle) {
     ops.push({
       label: "Group settings",
@@ -590,8 +592,8 @@ export function buildGroupOps(
     });
   }
 
-  // --- chores & subgroups: any member may edit, so go through the
-  //     update_group_docs RPC (the groups UPDATE policy is treasurer-only).
+  // --- chores & subgroups: go through the permission-aware RPC rather than
+  //     the owner/treasurer groups UPDATE policy.
   //     The version we read comes along so the server can reject the write if
   //     someone else has changed these documents in the meantime. ---
   if (

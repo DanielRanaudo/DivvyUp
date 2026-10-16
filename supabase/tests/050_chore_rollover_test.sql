@@ -243,7 +243,7 @@ select throws_ok(
     $sql$,
     tests.recall('group'), tests.recall('group'), tests.recall('group')
   ),
-  'Only the treasurer can edit chores',
+  'Only the group owner or treasurer can edit chores',
   'a roommate cannot claim someone else''s unconfirmed occurrence'
 );
 
@@ -267,7 +267,7 @@ select throws_ok(
     $sql$,
     tests.recall('group'), tests.recall('group'), tests.recall('group')
   ),
-  'Only the treasurer can edit chores',
+  'Only the group owner or treasurer can edit chores',
   'a non-treasurer cannot excuse even their own occurrence'
 );
 

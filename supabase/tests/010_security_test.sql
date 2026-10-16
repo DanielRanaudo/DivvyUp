@@ -59,7 +59,7 @@ select throws_ok(
     'update public.group_members set is_treasurer = true where id = %L',
     tests.recall('bea_member')
   ),
-  'Only a treasurer can change who the treasurer is',
+  'Treasurer changes must use transfer_treasurer',
   'a member cannot make themselves treasurer'
 );
 
@@ -358,7 +358,7 @@ select throws_ok(
     'select public.transfer_treasurer(%L, %L)',
     tests.recall('group'), tests.recall('bea_member')
   ),
-  'Only the current treasurer can hand over the role',
+  'Only the group owner or current treasurer can hand over the role',
   'a member cannot transfer the treasurer role to themselves'
 );
 

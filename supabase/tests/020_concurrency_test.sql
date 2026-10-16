@@ -96,7 +96,7 @@ select throws_ok(
     'select public.update_group_docs(%L, ''[]''::jsonb, ''[{"id":"b"}]''::jsonb, 2)',
     tests.recall('group')
   ),
-  'Only the treasurer can delete chores',
+  'Only the group owner or treasurer can delete chores',
   'a member cannot delete another roommate''s chore'
 );
 
@@ -167,7 +167,7 @@ select throws_ok(
     tests.recall('rae_member'),
     tests.recall('rae_member')
   ),
-  'Only the treasurer can edit chores',
+  'Only the group owner or treasurer can edit chores',
   'a member cannot change a chore frequency or rotation'
 );
 

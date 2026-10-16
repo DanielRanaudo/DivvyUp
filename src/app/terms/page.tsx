@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of use" updated="27 July 2026">
+    <LegalPage title="Terms of use" updated="16 October 2026">
       <p>
         DivvyUp helps roommates keep track of who owes what. Using it means
         accepting the following.
@@ -33,13 +33,15 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <Section heading="The treasurer has real authority">
+      <Section heading="Owners and treasurers have different authority">
         <p>
-          Each group has a treasurer, who sets rent, adds bills, and approves or
-          denies expense requests. Choose someone you trust. Anyone can see
-          every charge and payment in their group, so the treasurer&apos;s
-          decisions are visible to everyone, but they are not reversible by
-          anyone else.
+          The person who creates a group is its owner and may manage chores,
+          members, and group settings while they remain a member. Each group
+          also has a treasurer, who sets rent, adds bills, and approves or
+          denies expense requests. The owner may assign that role but does not
+          gain its financial powers unless they are also the treasurer. Choose
+          both roles carefully. Everyone in the group can see its charges and
+          payments.
         </p>
       </Section>
 

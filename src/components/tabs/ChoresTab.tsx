@@ -26,7 +26,7 @@ interface ChoresTabProps {
   group: Group;
   setGroup: (updater: (prev: Group) => Group) => void;
   currentUser: Member;
-  isTreasurer: boolean;
+  canManageChores: boolean;
 }
 
 type FormState =
@@ -38,7 +38,7 @@ export default function ChoresTab({
   group,
   setGroup,
   currentUser,
-  isTreasurer,
+  canManageChores,
 }: ChoresTabProps) {
   const chores = group.chores ?? [];
   const members = roster(group.members);
@@ -169,7 +169,7 @@ export default function ChoresTab({
         />
       )}
 
-      {editing && isTreasurer && (
+      {editing && canManageChores && (
         <ChoreForm
           key={editing.id}
           members={group.members}
@@ -179,7 +179,8 @@ export default function ChoresTab({
         />
       )}
 
-      {isTreasurer && chores.some((chore) => !isChoreComplete(chore)) && (
+      {canManageChores &&
+        chores.some((chore) => !isChoreComplete(chore)) && (
         <div style={{ marginBottom: 20 }}>
           <DayLabel color={T.secondary}>Manage schedules</DayLabel>
           <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
@@ -347,7 +348,7 @@ export default function ChoresTab({
             chores={chores}
             members={members}
             currentUserId={currentUser.id}
-            isTreasurer={isTreasurer}
+            canManageChores={canManageChores}
             onReportLater={reportLater}
             onExcuse={excuseOccurrence}
           />

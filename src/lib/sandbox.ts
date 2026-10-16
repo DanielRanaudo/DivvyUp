@@ -9,13 +9,17 @@ import type { Chore, Group, Member } from "./types";
  * house with enough people in it to split a bill badly.
  */
 export function sandboxMembers(): Member[] {
-  const demo = (name: string, venmo: string, zelle: string): Member => ({
-    id: uid(),
-    name,
-    venmo,
-    zelle,
-    isTreasurer: false,
-  });
+  const demo = (name: string, venmo: string, zelle: string): Member => {
+    const id = uid();
+    return {
+      id,
+      userId: id,
+      name,
+      venmo,
+      zelle,
+      isTreasurer: false,
+    };
+  };
 
   return [
     demo("Alex", "@alex-v", "(555) 201-4410"),
@@ -71,6 +75,7 @@ export function localGroup(name: string, you: Member): Group {
   const others = IS_SANDBOX ? sandboxMembers() : [];
   return {
     id: uid(),
+    createdBy: you.userId ?? you.id,
     name,
     code: groupCode(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",

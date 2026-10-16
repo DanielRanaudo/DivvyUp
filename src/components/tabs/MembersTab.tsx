@@ -18,7 +18,8 @@ interface MembersTabProps {
   group: Group;
   setGroup: (updater: (prev: Group) => Group) => void;
   currentUser: Member;
-  isTreasurer: boolean;
+  isOwner: boolean;
+  canManageGroup: boolean;
   allCharges: Charge[];
 }
 
@@ -26,7 +27,8 @@ export default function MembersTab({
   group,
   setGroup,
   currentUser,
-  isTreasurer,
+  isOwner,
+  canManageGroup,
   allCharges,
 }: MembersTabProps) {
   const simpleCount = calcSimpleSettlements(
@@ -56,7 +58,7 @@ export default function MembersTab({
   const removalTarget = group.members.find((m) => m.id === pendingRemoval);
   const transferTarget = group.members.find((m) => m.id === pendingTransfer);
 
-  // Previewing the removal shows the treasurer exactly what it will change
+  // Previewing the removal shows the manager exactly what it will change
   // before they commit — re-split rent, reassigned chores, and so on.
   const removalPreview = useMemo(
     () => (pendingRemoval ? removeMember(group, pendingRemoval).notes : []),
@@ -221,6 +223,18 @@ export default function MembersTab({
                     Treasurer
                   </span>
                 )}
+                {m.userId === group.createdBy && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 11,
+                      color: T.blue,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Owner
+                  </span>
+                )}
                 {m.id === currentUser.id && (
                   <span
                     style={{
@@ -240,7 +254,9 @@ export default function MembersTab({
                 </div>
               )}
             </div>
-            {isTreasurer && !m.isTreasurer && m.id !== currentUser.id && (
+            {canManageGroup &&
+              !m.isTreasurer &&
+              (m.id !== currentUser.id || isOwner) && (
               <div style={{ display: "flex", gap: 6 }}>
                 <button
                   onClick={() => setPendingTransfer(m.id)}
@@ -259,23 +275,27 @@ export default function MembersTab({
                 >
                   Make treasurer
                 </button>
-                <button
-                  onClick={() => startRemoval(m.id)}
-                  aria-label={`Remove ${m.name} from the group`}
-                  style={{
-                    background: "none",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8,
-                    padding: "5px 12px",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: T.tertiary,
-                    cursor: "pointer",
-                    fontFamily: T.font,
-                  }}
-                >
-                  Remove
-                </button>
+                {m.id !== currentUser.id &&
+                  m.userId !== group.createdBy &&
+                  !m.isTreasurer && (
+                    <button
+                      onClick={() => startRemoval(m.id)}
+                      aria-label={`Remove ${m.name} from the group`}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 8,
+                        padding: "5px 12px",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: T.tertiary,
+                        cursor: "pointer",
+                        fontFamily: T.font,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
               </div>
             )}
           </div>
@@ -300,13 +320,17 @@ export default function MembersTab({
         title={`Make ${transferTarget?.name ?? "member"} treasurer?`}
         message={`${
           transferTarget?.name ?? "They"
-        } will collect the open rent and household bills, and will be able to edit chore schedules, set rent, add bills, and approve expenses. You'll lose those abilities.`}
+        } will collect the open rent and household bills, set rent, add bills, and approve expenses. ${
+          isOwner
+            ? "You'll remain the owner and keep chore, member, and group-setting controls."
+            : "You'll lose the treasurer's financial and household-management controls."
+        }`}
         confirmLabel="Hand over"
         onConfirm={confirmTransfer}
         onCancel={() => setPendingTransfer(null)}
       />
 
-      {isTreasurer && (
+      {canManageGroup && (
         <div style={{ marginTop: 32 }}>
           <h3
             style={{

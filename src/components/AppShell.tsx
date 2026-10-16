@@ -21,6 +21,7 @@ interface AppShellProps {
   groups: Group[];
   currentUser: Member;
   isTreasurer: boolean;
+  isOwner: boolean;
   tabs: Tab[];
   tab: string;
   allCharges: Charge[];
@@ -38,6 +39,7 @@ export default function AppShell({
   groups,
   currentUser,
   isTreasurer,
+  isOwner,
   tabs,
   tab,
   allCharges,
@@ -48,6 +50,8 @@ export default function AppShell({
   onViewAs,
   onCloseMonth,
 }: AppShellProps) {
+  const canManageGroup = isOwner || isTreasurer;
+
   return (
     <div
       style={{
@@ -179,7 +183,7 @@ export default function AppShell({
             group={group}
             setGroup={setGroup}
             currentUser={currentUser}
-            isTreasurer={isTreasurer}
+            canManageChores={canManageGroup}
           />
         )}
         {tab === "settle" && (
@@ -197,7 +201,8 @@ export default function AppShell({
             group={group}
             setGroup={setGroup}
             currentUser={currentUser}
-            isTreasurer={isTreasurer}
+            isOwner={isOwner}
+            canManageGroup={canManageGroup}
             allCharges={allCharges}
           />
         )}

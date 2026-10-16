@@ -319,8 +319,10 @@ export function useGroupStore({
       }
 
       const meta = session?.user?.user_metadata ?? {};
+      const memberId = uid();
       const you: Member = {
-        id: uid(),
+        id: memberId,
+        userId: session?.user.id ?? memberId,
         name: (meta.name as string)?.trim() || "You",
         venmo: (meta.venmo as string)?.trim() || "",
         zelle: (meta.zelle as string)?.trim() || "",
@@ -546,6 +548,8 @@ export function useGroupStore({
     activeGroupId,
     currentUser,
     isTreasurer: currentUser?.isTreasurer ?? false,
+    isOwner:
+      !!group?.createdBy && group.createdBy === (currentUser?.userId ?? null),
     myMemberIds,
     allCharges,
     loading,

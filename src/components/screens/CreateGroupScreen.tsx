@@ -52,8 +52,8 @@ export default function CreateGroupScreen({
           lineHeight: 1.5,
         }}
       >
-        You&apos;ll be the treasurer — managing rent, utilities, and approving
-        expenses.
+        You&apos;ll own the group and start as treasurer. You can hand off the
+        finances later without losing household-management controls.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div>

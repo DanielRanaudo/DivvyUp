@@ -63,6 +63,7 @@ function DivvyUp() {
     group,
     currentUser,
     isTreasurer,
+    isOwner,
     myMemberIds,
     allCharges,
     saveError,
@@ -204,6 +205,8 @@ function DivvyUp() {
               memberCount: g.members.length,
               isTreasurer:
                 g.members.find((m) => m.id === myId)?.isTreasurer ?? false,
+              isOwner:
+                !!session?.user?.id && g.createdBy === session.user.id,
             };
           })}
           activeGroupId={store.activeGroupId}
@@ -222,6 +225,7 @@ function DivvyUp() {
           groups={groups}
           currentUser={currentUser}
           isTreasurer={isTreasurer}
+          isOwner={isOwner}
           tabs={tabs}
           tab={tab}
           allCharges={allCharges}

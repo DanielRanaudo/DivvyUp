@@ -8,6 +8,7 @@ export interface ProfileGroup {
   name: string;
   memberCount: number;
   isTreasurer: boolean;
+  isOwner: boolean;
 }
 
 interface GroupListProps {
@@ -111,6 +112,7 @@ export default function GroupList({
               </span>
               <span style={{ display: "block", ...rowLabel, marginTop: 2 }}>
                 {g.memberCount} {g.memberCount === 1 ? "member" : "members"}
+                {g.isOwner ? " · Owner" : ""}
                 {g.isTreasurer ? " · Treasurer" : ""}
               </span>
             </span>

@@ -24,7 +24,7 @@ interface ChoreHistoryProps {
   chores: Chore[];
   members: Roster;
   currentUserId: string;
-  isTreasurer: boolean;
+  canManageChores: boolean;
   onReportLater: (choreId: string, date: string, assigneeId: string) => void;
   onExcuse: (choreId: string, date: string, assigneeId: string) => void;
 }
@@ -34,7 +34,7 @@ export default function ChoreHistory({
   chores,
   members,
   currentUserId,
-  isTreasurer,
+  canManageChores,
   onReportLater,
   onExcuse,
 }: ChoreHistoryProps) {
@@ -77,7 +77,7 @@ export default function ChoreHistory({
           const canReport =
             outcome === "not_confirmed" &&
             entry.assigneeId === currentUserId;
-          const canExcuse = outcome === "not_confirmed" && isTreasurer;
+          const canExcuse = outcome === "not_confirmed" && canManageChores;
 
           return (
             <div
