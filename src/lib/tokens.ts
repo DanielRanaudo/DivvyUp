@@ -19,8 +19,8 @@ export const T = {
   radiusSm: 12,
   shadow: "0 2px 12px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)",
   shadowLg: "0 8px 30px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1)",
-  font: "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
-  mono: "'JetBrains Mono', 'SF Mono', monospace",
+  font: "var(--font-inter), -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
+  mono: "var(--font-jetbrains-mono), 'SF Mono', monospace",
 } as const;
 
 export const GRADIENTS = [
@@ -84,6 +84,3 @@ export const overline: React.CSSProperties = {
   letterSpacing: "0.05em",
   margin: "0 0 10px 0",
 };
-
-export const FONT_URL =
-  "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
