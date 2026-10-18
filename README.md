@@ -179,7 +179,11 @@ the screenshots above are this mode.
    URLs**. Wildcards belong in this allow-list, never in **Site URL**.
 5. Set `NEXT_PUBLIC_SITE_URL=https://divvyup.site` in the Vercel production
    environment, then redeploy. Auth email links use this canonical origin.
-6. `npm run dev`.
+6. To enable daily emails, verify your sending domain in Resend and set
+   `RESEND_API_KEY`, `REMINDER_FROM`, `SUPABASE_SERVICE_ROLE_KEY`, and a random
+   `CRON_SECRET` of at least 16 characters in Vercel. The chore digest runs at
+   13:00 UTC (8–9 a.m. Eastern, depending on daylight saving time).
+7. `npm run dev`.
 
 | Script | Purpose |
 |--------|---------|
@@ -220,9 +224,10 @@ supabase/
 **Deployment.** [Vercel](https://vercel.com): import the repo, set
 `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and add the
 production domain to Supabase's auth URL configuration. `vercel.json` schedules
-the daily reminder job; auth emails go through [Resend](https://resend.com) SMTP.
-Sentry and reminder emails are optional — without their env vars the app runs
-normally. Migrations are append-only and safe to re-run.
+the daily approval and chore reminder jobs; application emails use the Resend
+API, while Supabase auth emails can use Resend SMTP. Sentry and reminder emails
+are optional — without their env vars the app runs normally. Migrations are
+append-only and safe to re-run.
 
 ---
 
