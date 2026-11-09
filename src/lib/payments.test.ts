@@ -41,12 +41,22 @@ describe("paymentsAwaiting", () => {
     expect(paymentsAwaiting([mine, theirs], "a")).toEqual([mine]);
   });
 
+  it("lets a treasurer review every pending payment", () => {
+    const mine = payment();
+    const theirs = payment({ id: "p2", toId: "c" });
+    expect(paymentsAwaiting([mine, theirs], "a", true)).toEqual([
+      mine,
+      theirs,
+    ]);
+  });
+
   it("ignores payments that have already been answered", () => {
     const answered = [
       payment({ id: "p1", status: "confirmed" }),
       payment({ id: "p2", status: "rejected" }),
     ];
     expect(paymentsAwaiting(answered, "a")).toEqual([]);
+    expect(paymentsAwaiting(answered, "a", true)).toEqual([]);
   });
 
   it("treats a group with no payments as nothing to do", () => {

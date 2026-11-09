@@ -115,6 +115,42 @@ test("a fronted expense becomes a debt, gets paid, and is confirmed", async ({
   await expect(page.getByText("Waiting for")).toHaveCount(0);
 });
 
+test("the treasurer can report a payment for another roommate", async ({
+  page,
+}) => {
+  await createGroup(page, "Treasurer Payment House");
+
+  await viewAs(page, "Alex");
+  await submitExpense(page, "Shared supplies", EXPENSE);
+
+  await viewAs(page, "You (Treasurer)");
+  await page
+    .getByRole("button", { name: "Approve Shared supplies, split evenly" })
+    .click();
+  await openTab(page, "Settle");
+
+  // Jordan has not reported anything, but the treasurer can report the payment
+  // on Jordan's behalf. It still waits for review like any other payment.
+  await page
+    .getByRole("button", {
+      name: "Mark Jordan's payment to Alex as paid",
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Payments to Review" })
+  ).toBeVisible();
+  await expect(page.getByText("Jordan says they paid Alex")).toBeVisible();
+
+  // The treasurer may also perform the review without either roommate acting.
+  await page
+    .getByRole("button", {
+      name: `Confirm the $${SHARE.toFixed(2)} from Jordan to Alex`,
+    })
+    .click();
+  await expect(page.getByText("Jordan says they paid Alex")).toHaveCount(0);
+  await expect(page.getByText(`Confirmed · ${TODAY}`)).toBeVisible();
+});
+
 test("an expense can be split between only the people who shared it", async ({
   page,
 }) => {

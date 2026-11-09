@@ -3,7 +3,7 @@ import type { Tab } from "./types";
 export interface TabBadges {
   /** Expenses waiting for a treasurer's decision. */
   expenses: number;
-  /** Payments waiting for you to confirm you were paid. */
+  /** Payments waiting for this member, or the treasurer, to review. */
   payments: number;
   /** Chores of yours that are due. */
   chores: number;

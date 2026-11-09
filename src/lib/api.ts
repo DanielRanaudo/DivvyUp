@@ -813,7 +813,7 @@ export function buildGroupOps(
     }
   }
 
-  // --- payments (insert = payer only; update = recipient/treasurer confirm) ---
+  // --- payments (insert = payer/treasurer; update = recipient/treasurer) ---
   {
     const prevP = indexById(prev.payments);
     const nextP = indexById(next.payments);

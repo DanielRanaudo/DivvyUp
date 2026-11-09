@@ -9,12 +9,14 @@ interface NotificationBannerProps {
   notifications: Payment[];
   onAction: (paymentId: string, status: "confirmed" | "rejected") => void;
   group: Group;
+  viewerId: string;
 }
 
 export default function NotificationBanner({
   notifications,
   onAction,
   group,
+  viewerId,
 }: NotificationBannerProps) {
   if (notifications.length === 0) return null;
   return (
@@ -22,6 +24,11 @@ export default function NotificationBanner({
       {notifications.map((n) => {
         const fromMember = group.members.find((m) => m.id === n.fromId);
         const fromIdx = fromMember ? group.members.indexOf(fromMember) : 0;
+        const viewerWasPaid = n.toId === viewerId;
+        const paymentDescription = viewerWasPaid
+          ? `${n.fromName} paid you`
+          : `${n.fromName} says they paid ${n.toName}`;
+        const paymentDirection = viewerWasPaid ? "" : ` to ${n.toName}`;
         return (
           <div
             key={n.id}
@@ -43,7 +50,7 @@ export default function NotificationBanner({
               />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>
-                  {n.fromName} paid you
+                  {paymentDescription}
                 </div>
                 <div
                   style={{
@@ -72,9 +79,7 @@ export default function NotificationBanner({
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button
                 onClick={() => onAction(n.id, "confirmed")}
-                aria-label={`Confirm the ${formatMoney(n.amount)} from ${
-                  n.fromName
-                }`}
+                aria-label={`Confirm the ${formatMoney(n.amount)} from ${n.fromName}${paymentDirection}`}
                 style={{
                   flex: 1,
                   padding: "10px 0",
@@ -92,9 +97,7 @@ export default function NotificationBanner({
               </button>
               <button
                 onClick={() => onAction(n.id, "rejected")}
-                aria-label={`Deny the ${formatMoney(n.amount)} from ${
-                  n.fromName
-                }`}
+                aria-label={`Deny the ${formatMoney(n.amount)} from ${n.fromName}${paymentDirection}`}
                 style={{
                   flex: 1,
                   padding: "10px 0",

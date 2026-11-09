@@ -81,7 +81,7 @@ function DivvyUp() {
     expenses: stillOpen(group?.expenses).filter((e) => e.status === "pending")
       .length,
     payments: currentUser
-      ? paymentsAwaiting(group?.payments, currentUser.id).length
+      ? paymentsAwaiting(group?.payments, currentUser.id, isTreasurer).length
       : 0,
     chores: currentUser
       ? myOpenChoreCount(group?.chores ?? [], currentUser.id)

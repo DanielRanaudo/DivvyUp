@@ -152,6 +152,7 @@ export default function AppShell({
           <DashboardTab
             group={group}
             currentUser={currentUser}
+            isTreasurer={isTreasurer}
             allCharges={allCharges}
             setGroup={setGroup}
             setTab={onOpenTab}

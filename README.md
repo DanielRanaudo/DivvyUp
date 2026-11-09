@@ -88,8 +88,9 @@ The browser talks to Supabase directly, so every authorization decision is
 enforced by row-level security and `SECURITY DEFINER` RPCs:
 
 - Members read only their own groups; owners manage chores, members, and group
-  settings; rent and bills remain treasurer-only writes; payments are
-  confirmable only by the recipient.
+  settings; rent and bills remain treasurer-only writes; payments can be
+  reported by the payer or treasurer and confirmed by the recipient or
+  treasurer.
 - Sensitive transitions are RPCs, validated server-side — `approve_expense`
   re-derives splits and checks they sum to the amount within a cent,
   `confirm_payment` refuses amount changes mid-confirmation, and
@@ -108,9 +109,9 @@ one now has a test proving it stays closed.
 
 | Layer | Tool | Covers |
 |---|---|---|
-| **243 unit tests** (17 files) | Vitest | Money logic — splits, settlements, chore rotation and calendar feeds, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
-| **14 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
-| **132 database assertions** | pgTAP | Owner/treasurer separation, ordinary-member authorization, privilege-escalation defenses, and concurrent-write safety |
+| **251 unit tests** (18 files) | Vitest | Money logic — splits, settlements, chore rotation and calendar feeds, close-out, member removal, CSV escaping — plus diff-based persistence against a fake Supabase client |
+| **15 browser tests** | Playwright | The full household path: front an expense, approve, settle, confirm, close the month |
+| **136 database assertions** | pgTAP | Owner/treasurer separation, ordinary-member authorization, privilege-escalation defenses, and concurrent-write safety |
 
 All three run in GitHub Actions on every push and PR, alongside lint, typecheck,
 and a production build.

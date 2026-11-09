@@ -72,7 +72,11 @@ export default function SettleTab({
 
   // Confirming used to live only on the dashboard banner, which is easy to miss
   // when you came here to chase what you're owed.
-  const awaitingMe = paymentsAwaiting(payments, currentUser.id);
+  const awaitingMe = paymentsAwaiting(
+    payments,
+    currentUser.id,
+    isTreasurer
+  );
   const decide = (paymentId: string, decision: PaymentDecision) =>
     setGroup((prev) => decidePayment(prev, paymentId, decision));
 
@@ -112,10 +116,12 @@ export default function SettleTab({
     (s) => s.fromId !== currentUser.id && s.toId !== currentUser.id
   );
 
-  const renderSettlement = (s: Settlement, i: number, showAction: boolean) => {
+  const renderSettlement = (s: Settlement, i: number) => {
     const fromM = memberById(s.fromId);
     const existing = getPaymentStatus(s.fromId, s.toId);
     const toM = memberById(s.toId);
+    const isMyDebt = s.fromId === currentUser.id;
+    const canReportPaid = !existing && (isMyDebt || isTreasurer);
     return (
       <div
         key={`${s.fromId}-${s.toId}-${i}`}
@@ -192,9 +198,14 @@ export default function SettleTab({
             Waiting for {s.toName} to confirm · sent {formatDate(existing.date)}
           </div>
         )}
-        {!existing && showAction && s.fromId === currentUser.id && (
+        {canReportPaid && (
           <div style={{ marginTop: 10, marginLeft: 48 }}>
             <button
+              aria-label={
+                isMyDebt
+                  ? undefined
+                  : `Mark ${s.fromName}'s payment to ${s.toName} as paid`
+              }
               onClick={() =>
                 markAsPaid(s.fromId, s.fromName, s.toId, s.toName, s.amount)
               }
@@ -211,7 +222,7 @@ export default function SettleTab({
                 boxShadow: "0 2px 8px rgba(0,122,255,0.25)",
               }}
             >
-              I Paid This
+              {isMyDebt ? "I Paid This" : "They Paid This"}
             </button>
           </div>
         )}
@@ -235,12 +246,13 @@ export default function SettleTab({
       {awaitingMe.length > 0 && (
         <div style={{ marginBottom: 8 }}>
           <h3 style={{ ...SECTION_HEADING, color: T.orange }}>
-            Waiting on You
+            {isTreasurer ? "Payments to Review" : "Waiting on You"}
           </h3>
           <NotificationBanner
             notifications={awaitingMe}
             onAction={decide}
             group={group}
+            viewerId={currentUser.id}
           />
         </div>
       )}
@@ -262,7 +274,7 @@ export default function SettleTab({
         <div style={{ marginBottom: 24 }}>
           <h3 style={{ ...SECTION_HEADING, color: T.red }}>You Owe</h3>
           <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-            {myDebts.map((s, i) => renderSettlement(s, i, true))}
+            {myDebts.map((s, i) => renderSettlement(s, i))}
           </div>
         </div>
       )}
@@ -270,7 +282,7 @@ export default function SettleTab({
         <div style={{ marginBottom: 24 }}>
           <h3 style={{ ...SECTION_HEADING, color: T.green }}>Owed to You</h3>
           <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-            {owedToMe.map((s, i) => renderSettlement(s, i, false))}
+            {owedToMe.map((s, i) => renderSettlement(s, i))}
           </div>
         </div>
       )}
@@ -278,7 +290,7 @@ export default function SettleTab({
         <div style={{ marginBottom: 24 }}>
           <h3 style={{ ...SECTION_HEADING, color: T.tertiary }}>Others</h3>
           <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-            {otherSettlements.map((s, i) => renderSettlement(s, i, false))}
+            {otherSettlements.map((s, i) => renderSettlement(s, i))}
           </div>
         </div>
       )}

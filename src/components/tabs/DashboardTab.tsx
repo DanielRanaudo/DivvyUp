@@ -20,6 +20,7 @@ import ChoreBoard from "@/components/dashboard/ChoreBoard";
 interface DashboardTabProps {
   group: Group;
   currentUser: Member;
+  isTreasurer: boolean;
   allCharges: Charge[];
   setGroup: (updater: (prev: Group) => Group) => void;
   setTab: (tab: string) => void;
@@ -28,6 +29,7 @@ interface DashboardTabProps {
 export default function DashboardTab({
   group,
   currentUser,
+  isTreasurer,
   allCharges,
   setGroup,
   setTab,
@@ -47,7 +49,11 @@ export default function DashboardTab({
     .filter((c) => c.recurring)
     .reduce((sum, c) => sum + c.amount, 0);
 
-  const awaitingMe = paymentsAwaiting(group.payments, currentUser.id);
+  const awaitingMe = paymentsAwaiting(
+    group.payments,
+    currentUser.id,
+    isTreasurer
+  );
   const decide = (paymentId: string, status: PaymentDecision) =>
     setGroup((prev) => decidePayment(prev, paymentId, status));
 
@@ -65,6 +71,7 @@ export default function DashboardTab({
         notifications={awaitingMe}
         onAction={decide}
         group={group}
+        viewerId={currentUser.id}
       />
       <div className="dashboard-grid">
         <div>
